@@ -2,4 +2,4 @@
 
 Zig-Zag decoder in Aiken, just for fun!
 
-Based on [Gist by `mfuestenau`](https://gist.github.com/mfuerstenau/ba870a29e16536fdbaba).
+Based on [Gist by `mfuerstenau`](https://gist.github.com/mfuerstenau/ba870a29e16536fdbaba).
