@@ -1,3 +1,3 @@
 # Aiken Zig-Zag Decoder
 
-Zig-Zag decoder in Aiken, just for fun!
+Zig-Zag decoder in Aiken.
