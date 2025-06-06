@@ -1,3 +1,3 @@
 # Aiken Zig-Zag Decoder
 
-Zig-Zag decoder in Aiken.
+Zig-Zag encoders and decoder in Aiken.
