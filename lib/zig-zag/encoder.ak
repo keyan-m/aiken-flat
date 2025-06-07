@@ -30,3 +30,8 @@ pub fn zig_zag_32(num: Int) -> ByteArray {
 pub fn zig_zag_64(num: Int) -> ByteArray {
   zig_zag(num, 8)
 }
+
+/// Attempts to encode the given integer in 128 bits (16 bytes).
+pub fn zig_zag_128(num: Int) -> ByteArray {
+  zig_zag(num, 16)
+}

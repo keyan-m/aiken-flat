@@ -2,7 +2,7 @@ use aiken/collection/list
 use aiken/fuzz
 use aiken/math.{max}
 use zig_zag/decoder.{zag_zig}
-use zig_zag/encoder.{zig_zag_16, zig_zag_32, zig_zag_64, zig_zag_8}
+use zig_zag/encoder.{zig_zag_128, zig_zag_16, zig_zag_32, zig_zag_64, zig_zag_8}
 
 fn bytes_fuzzer_8(size: Int) -> Fuzzer<List<ByteArray>> {
   fuzz.bytearray_fixed(1) |> fuzz.list_at_most(max(1, size))
@@ -18,6 +18,10 @@ fn bytes_fuzzer_32(size: Int) -> Fuzzer<List<ByteArray>> {
 
 fn bytes_fuzzer_64(size: Int) -> Fuzzer<List<ByteArray>> {
   fuzz.bytearray_fixed(8) |> fuzz.list_at_most(max(1, size))
+}
+
+fn bytes_fuzzer_128(size: Int) -> Fuzzer<List<ByteArray>> {
+  fuzz.bytearray_fixed(16) |> fuzz.list_at_most(max(1, size))
 }
 
 fn ints_fuzzer_8(size: Int) -> Fuzzer<List<Int>> {
@@ -51,8 +55,24 @@ fn ints_fuzzer_64(size: Int) -> Fuzzer<List<Int>> {
   )
 }
 
+fn ints_fuzzer_128(size: Int) -> Fuzzer<List<Int>> {
+  fuzz.list_at_most(
+    fuzz.either(
+      fuzz.int_between(
+        -170141183460469231731687303715884105728,
+        -9223372036854775809,
+      ),
+      fuzz.int_between(
+        9223372036854775808,
+        170141183460469231731687303715884105727,
+      ),
+    ),
+    max(1, size),
+  )
+}
+
 fn bytes_fuzzer(size: Int) -> Fuzzer<(Int, List<ByteArray>)> {
-  let (_, bit_count) <- fuzz.and_then(fuzz.pick([8, 16, 32, 64]))
+  let (_, bit_count) <- fuzz.and_then(fuzz.pick([8, 16, 32, 64, 128]))
   let fuzzer =
     if bit_count == 8 {
       bytes_fuzzer_8(size)
@@ -60,15 +80,17 @@ fn bytes_fuzzer(size: Int) -> Fuzzer<(Int, List<ByteArray>)> {
       bytes_fuzzer_16(size)
     } else if bit_count == 32 {
       bytes_fuzzer_32(size)
-    } else {
+    } else if bit_count == 64 {
       bytes_fuzzer_64(size)
+    } else {
+      bytes_fuzzer_128(size)
     }
   let bytes <- fuzz.and_then(fuzzer)
   fuzz.constant((bit_count, bytes))
 }
 
 fn ints_fuzzer(size: Int) -> Fuzzer<(Int, List<Int>)> {
-  let (_, bit_count) <- fuzz.and_then(fuzz.pick([8, 16, 32, 64]))
+  let (_, bit_count) <- fuzz.and_then(fuzz.pick([8, 16, 32, 64, 128]))
   let fuzzer =
     if bit_count == 8 {
       ints_fuzzer_8(size)
@@ -76,8 +98,10 @@ fn ints_fuzzer(size: Int) -> Fuzzer<(Int, List<Int>)> {
       ints_fuzzer_16(size)
     } else if bit_count == 32 {
       ints_fuzzer_32(size)
-    } else {
+    } else if bit_count == 64 {
       ints_fuzzer_64(size)
+    } else {
+      ints_fuzzer_128(size)
     }
   let ints <- fuzz.and_then(fuzzer)
   fuzz.constant((bit_count, ints))
@@ -94,6 +118,8 @@ fn validate_roundtrip_from_bytes(bit_count: Int, bytes: List<ByteArray>) -> Bool
       decoded |> list.map(zig_zag_32)
     } else if bit_count == 64 {
       decoded |> list.map(zig_zag_64)
+    } else if bit_count == 128 {
+      decoded |> list.map(zig_zag_128)
     } else {
       []
     }
@@ -110,6 +136,8 @@ fn validate_roundtrip_from_ints(bit_count: Int, ints: List<Int>) -> Bool {
       ints |> list.map(zig_zag_32)
     } else if bit_count == 64 {
       ints |> list.map(zig_zag_64)
+    } else if bit_count == 128 {
+      ints |> list.map(zig_zag_128)
     } else {
       []
     }
