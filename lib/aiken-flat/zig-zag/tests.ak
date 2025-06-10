@@ -1,8 +1,10 @@
 use aiken/collection/list
 use aiken/fuzz
 use aiken/math.{max}
-use zig_zag/decoder.{zag_zig}
-use zig_zag/encoder.{zig_zag_128, zig_zag_16, zig_zag_32, zig_zag_64, zig_zag_8}
+use aiken_flat/zig_zag/decoder.{zag_zig}
+use aiken_flat/zig_zag/encoder.{
+  zig_zag_128, zig_zag_16, zig_zag_32, zig_zag_64, zig_zag_8,
+}
 
 fn bytes_fuzzer_8(size: Int) -> Fuzzer<List<ByteArray>> {
   fuzz.bytearray_fixed(1) |> fuzz.list_at_most(max(1, size))
