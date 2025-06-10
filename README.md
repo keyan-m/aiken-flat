@@ -1,3 +1,3 @@
-# Aiken Zig-Zag Decoder
+# Aiken Flat Encoder and Decoder
 
-Zig-Zag encoders and decoder in Aiken.
+Based on [Flat specs](http://quid2.org/docs/Flat.pdf).
