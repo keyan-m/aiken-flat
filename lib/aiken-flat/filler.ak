@@ -1,5 +1,5 @@
 use aiken/collection/list
-use aiken_flat/bits.{Bits, One, Zero}
+use aiken_flat/bits.{Bits}
 
 pub type Filler {
   Bit { filler: Filler }
@@ -15,7 +15,7 @@ pub fn length(filler: Filler) -> Int {
 
 pub fn to_bits(filler: Filler) -> Bits {
   when filler is {
-    Bit { filler } -> to_bits(filler) |> list.push(Zero)
-    End -> [One]
+    Bit { filler } -> to_bits(filler) |> list.push(False)
+    End -> [True]
   }
 }
