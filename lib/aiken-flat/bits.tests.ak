@@ -1,7 +1,7 @@
 use aiken/fuzz
 use aiken/math.{max}
 use aiken_flat/bits.{
-  Bits, and_with_padding, and_with_truncation, or_with_padding,
+  Bits, and_with_padding, and_with_truncation, from_bytearray, or_with_padding,
   or_with_truncation, pad_to_byte, pretty_print, to_bytearray,
 }
 
@@ -72,13 +72,34 @@ test success__pretty_print() {
   result == @"0000010110101010"
 }
 
-test success__to_bytearray() {
-  let bits = [True, True, True, True, True, True, True, True, True, True]
-  let expected = #"03ff"
-  let result = to_bytearray(bits)
-  result == expected
-}
-
 fn bits_fuzzer(size: Int) -> Fuzzer<Bits> {
   fuzz.list_at_most(fuzz.bool(), max(1, size))
+}
+
+fn validate_roundtrip_from_bits(bits: Bits) -> Bool {
+  let bytes = to_bytearray(bits)
+  let reencoded = from_bytearray(bytes)
+  pad_to_byte(bits) == reencoded
+}
+
+fn validate_roundtrip_from_bytes(bytes: ByteArray) -> Bool {
+  let bits = from_bytearray(bytes)
+  let reencoded = to_bytearray(bits)
+  bytes == reencoded
+}
+
+test success__roundtrip_from_bits(bits via bits_fuzzer(100)) {
+  validate_roundtrip_from_bits(bits)
+}
+
+test success__roundtrip_from_bytes(bytes via fuzz.bytearray_between(0, 100)) {
+  validate_roundtrip_from_bytes(bytes)
+}
+
+bench bench__roundtrip_from_bits(bits via bits_fuzzer) {
+  validate_roundtrip_from_bits(bits)
+}
+
+bench bench__roundtrip_from_bytes(bytes via fuzz.bytearray_between(0, _)) {
+  validate_roundtrip_from_bytes(bytes)
 }

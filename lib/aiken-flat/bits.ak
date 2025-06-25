@@ -26,7 +26,7 @@ pub fn bit_or(left: Bit, right: Bit) -> Bit {
   }
 }
 
-pub fn to_string(bit: Bit) -> String {
+pub fn bit_to_string(bit: Bit) -> String {
   if bit {
     @"1"
   } else {
@@ -35,7 +35,8 @@ pub fn to_string(bit: Bit) -> String {
 }
 
 pub fn pretty_print(bits: Bits) -> String {
-  bits |> list.foldr(@"", fn(bit, acc) { string.concat(to_string(bit), acc) })
+  bits
+    |> list.foldr(@"", fn(bit, acc) { string.concat(bit_to_string(bit), acc) })
 }
 
 fn op_with_padding(left: Bits, right: Bits, op: fn(Bit, Bit) -> Bit) -> Bits {
@@ -114,8 +115,8 @@ fn unsafe_one_byte_to_bytearray(bools: List<Bool>) -> ByteArray {
 }
 
 test success__unsafe_one_byte_to_bytearray() {
-  let byte = [True, True, True, True, True, True, True, True]
-  let expected = #"ff"
+  let byte = [True, False, False, False, True, True, True, True]
+  let expected = #"8f"
   let result = unsafe_one_byte_to_bytearray(byte)
   result == expected
 }
@@ -156,7 +157,6 @@ pub fn to_bytearray(bits: Bits) -> ByteArray {
   to_bytearray_helper(padded_bools, #"")
 }
 
-/// Assumes given input is only one byte.
 fn unsafe_bits_from_one_byte(bytearray: ByteArray) -> Bits {
   [7, 6, 5, 4, 3, 2, 1, 0]
     |> list.foldr(
@@ -172,6 +172,51 @@ test success__unsafe_bits_from_one_byte() {
   result == expected
 }
 
-pub fn from_bytearray(bits: ByteArray) -> Bits {
-  todo
+fn unsafe_bits_to_word8(bits: Bits) -> Int {
+  bits
+    |> list.foldr(
+        #"00",
+        fn(bit, acc) {
+          let left_shited = builtin.shift_bytearray(acc, 1)
+          builtin.or_bytearray(
+            True,
+            left_shited,
+            if bit {
+              #"01"
+            } else {
+              #"00"
+            },
+          )
+        },
+      )
+    |> builtin.bytearray_to_integer(True, _)
+}
+
+test success__unsafe_bits_to_word8() {
+  let bits = [True, False, False, False, False, False, False, True]
+  let expected = 129
+  let result = unsafe_bits_to_word8(bits)
+  result == expected
+}
+
+fn unsafe_bits_from_word8(w8: Int) -> Bits {
+  w8 |> bytearray.from_int_big_endian(1) |> unsafe_bits_from_one_byte
+}
+
+test success__unsafe_bits_from_word8() {
+  let w8 = 129
+  let expected = [True, False, False, False, False, False, False, True]
+  let result = unsafe_bits_from_word8(w8)
+  result == expected
+}
+
+pub fn from_bytearray(bytes: ByteArray) -> Bits {
+  bytes
+    |> bytearray.foldr(
+        [],
+        fn(byte, acc) {
+          let bits = unsafe_bits_from_word8(byte)
+          list.concat(bits, acc)
+        },
+      )
 }
