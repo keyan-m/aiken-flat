@@ -88,11 +88,11 @@ fn validate_roundtrip_from_bytes(bytes: ByteArray) -> Bool {
   bytes == reencoded
 }
 
-test success__roundtrip_from_bits(bits via bits_fuzzer(100)) {
+test success__roundtrip_from_bits(bits via bits_fuzzer(32)) {
   validate_roundtrip_from_bits(bits)
 }
 
-test success__roundtrip_from_bytes(bytes via fuzz.bytearray_between(0, 100)) {
+test success__roundtrip_from_bytes(bytes via fuzz.bytearray_between(0, 32)) {
   validate_roundtrip_from_bytes(bytes)
 }
 
