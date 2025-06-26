@@ -179,7 +179,7 @@ fn unsafe_bits_to_word8(bits: Bits) -> Int {
         fn(bit, acc) {
           let left_shited = builtin.shift_bytearray(acc, 1)
           builtin.or_bytearray(
-            True,
+            False,
             left_shited,
             if bit {
               #"01"
