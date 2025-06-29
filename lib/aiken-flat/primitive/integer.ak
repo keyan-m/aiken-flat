@@ -47,7 +47,7 @@ pub fn shift_right(x: Integer, bit_count: Int) -> Integer {
 }
 
 /// Assumes x is positive, and finds the number of bytes needed to represent
-/// given number, up to 32 bytes.
+/// given number.
 fn do_find_byte_count(x: Int, count_so_far: Int) -> Int {
   if x < 256 {
     count_so_far
@@ -56,9 +56,7 @@ fn do_find_byte_count(x: Int, count_so_far: Int) -> Int {
   }
 }
 
-// {{{
-
-/// Fuzzer
+// {{{ Fuzzer
 const max_1 = 255
 
 const max_2 = 65535
