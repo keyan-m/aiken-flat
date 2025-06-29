@@ -1,3 +1,5 @@
+use aiken/primitive/bytearray
+
 pub fn zip_foldr(
   self: List<a>,
   bs: List<b>,
@@ -14,5 +16,30 @@ pub fn zip_foldr(
           with(x, y, c)
         }
       }
+  }
+}
+
+fn do_chunks(
+  bytes: ByteArray,
+  chunk_length: Int,
+  acc: List<ByteArray>,
+) -> List<ByteArray> {
+  if bytes == #"" {
+    acc
+  } else {
+    let left = bytes |> bytearray.take(chunk_length)
+    do_chunks(
+      bytes |> bytearray.drop(chunk_length),
+      chunk_length,
+      [left, ..acc],
+    )
+  }
+}
+
+pub fn bytearray_chunks(bytes: ByteArray, chunk_length: Int) -> List<ByteArray> {
+  if bytes == #"" {
+    []
+  } else {
+    do_chunks(bytes, chunk_length, [])
   }
 }
