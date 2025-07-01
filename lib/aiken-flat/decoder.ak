@@ -27,7 +27,7 @@ pub fn bytes(self: Decoder) -> (ByteArray, Decoder) {
   self |> filler |> byte_array
 }
 
-fn filler(self: Decoder) -> Decoder {
+pub fn filler(self: Decoder) -> Decoder {
   let (current_bit_is_zero, new_decoder) = self |> zero
   if current_bit_is_zero {
     filler(new_decoder)
