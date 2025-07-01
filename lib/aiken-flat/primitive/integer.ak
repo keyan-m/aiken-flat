@@ -18,12 +18,24 @@ pub fn is_zero(x: Integer) -> Bool {
   x.value == 0
 }
 
+pub const zero = Integer { value: 0, size: 1 }
+
+pub const one = Integer { value: 1, size: 1 }
+
 pub fn from_int(x: Int) -> Integer {
   Integer { value: x, size: do_find_byte_count(x, 1) }
 }
 
 pub fn to_int(x: Integer) -> Int {
   x.value
+}
+
+pub fn add(x: Integer, y: Integer) -> Integer {
+  from_int(x.value + y.value)
+}
+
+pub fn add_int(x: Integer, y: Int) -> Integer {
+  from_int(x.value + y)
 }
 
 pub fn size(x: Integer) -> Int {

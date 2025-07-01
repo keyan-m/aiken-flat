@@ -1,10 +1,81 @@
 use aiken/builtin
+use aiken/collection/list
 use aiken/primitive/bytearray
+use aiken_flat/primitive/integer.{Integer}
 
 pub opaque type Decoder {
   buffer: ByteArray,
   used_bits: Int,
   pos: Int,
+}
+
+pub fn bytes(self: Decoder) -> (ByteArray, Decoder) {
+  self |> filler |> byte_array
+}
+
+fn filler(self: Decoder) -> Decoder {
+  let (current_bit_is_zero, new_decoder) = self |> zero
+  if current_bit_is_zero {
+    filler(new_decoder)
+  } else {
+    new_decoder
+  }
+}
+
+pub fn word(self: Decoder) -> (Int, Decoder) {
+  let leading_bit = #"01"
+  let final_word = #"00"
+  let shl = integer.zero
+  do_word(self, leading_bit, final_word, shl)
+}
+
+fn do_word(
+  self: Decoder,
+  leading_bit: ByteArray,
+  final_word: ByteArray,
+  shl: Integer,
+) -> (Int, Decoder) {
+  if leading_bit == #"01" {
+    let (word8, new_decoder) = self |> bits8(8)
+    let word7 = builtin.and_bytearray(False, word8, #"7f")
+    let new_final_word =
+      builtin.or_bytearray(
+        False,
+        final_word,
+        builtin.shift_bytearray(word7, shl |> integer.to_int),
+      )
+    let new_shl = shl |> integer.add_int(7)
+    let new_leading_bit = builtin.and_bytearray(False, word8, #"80")
+    do_word(new_decoder, new_leading_bit, new_final_word, new_shl)
+  } else {
+    (builtin.bytearray_to_integer(True, final_word), self)
+  }
+}
+
+pub fn decode_list_with(
+  self: Decoder,
+  decoder_func: fn(Decoder) -> (a, Decoder),
+) -> List<a> {
+  do_decode_list_with(self, decoder_func, [])
+}
+
+fn do_decode_list_with(
+  self: Decoder,
+  decoder_func: fn(Decoder) -> (a, Decoder),
+  acc: List<a>,
+) -> List<a> {
+  let (current_bit, _) = self |> bit()
+  if current_bit {
+    let (decoded, new_decoder) = self |> decoder_func
+    do_decode_list_with(new_decoder, decoder_func, list.concat(acc, [decoded]))
+  } else {
+    acc
+  }
+}
+
+fn zero(self: Decoder) -> (Bool, Decoder) {
+  let (current_bit, new_decoder) = self |> bit()
+  (!current_bit, new_decoder)
 }
 
 fn bit(self: Decoder) -> (Bool, Decoder) {
@@ -30,8 +101,8 @@ fn do_byte_array(
 
   expect used_bits != 0
 
-  expect self |> ensure_bytes(1)
-
+  // `bytearray.at` fails if `pos` is out of bounds, so no need for
+  // `ensure_bytes` here.
   let chunk_len = buffer |> bytearray.at(pos)
 
   let new_pos = pos + 1
