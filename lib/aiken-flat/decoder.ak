@@ -2,11 +2,25 @@ use aiken/builtin
 use aiken/collection/list
 use aiken/primitive/bytearray
 use aiken_flat/primitive/integer.{Integer}
+use aiken_flat/zig_zag.{zag_zig}
 
 pub opaque type Decoder {
   buffer: ByteArray,
   used_bits: Int,
   pos: Int,
+}
+
+pub fn integer(self: Decoder) -> (Int, Decoder) {
+  let (w, new_decoder) = self |> word
+  (zag_zig(w), new_decoder)
+}
+
+pub fn bool(self: Decoder) -> (Bool, Decoder) {
+  self |> bit
+}
+
+pub fn u8(self: Decoder) -> (ByteArray, Decoder) {
+  self |> bits8(8)
 }
 
 pub fn bytes(self: Decoder) -> (ByteArray, Decoder) {
