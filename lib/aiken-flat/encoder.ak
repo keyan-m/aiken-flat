@@ -12,6 +12,23 @@ pub opaque type Encoder {
   current_byte: ByteArray,
 }
 
+pub fn new() -> Encoder {
+  Encoder {
+    buffer: #"",
+    used_bits: 0,
+    current_byte: #"00",
+  }
+}
+
+/// Assumes given ByteArray is a single byte.
+pub fn unsafe_u8(self: Encoder, u8: ByteArray) -> Encoder {
+  if self.used_bits == 0 {
+    next_word(Encoder { ..self, current_byte: u8 })
+  } else {
+    byte_unaligned(self, u8)
+  }
+}
+
 pub fn bool(self: Encoder, b: Bool) -> Encoder {
   if b {
     one(self)
@@ -20,7 +37,7 @@ pub fn bool(self: Encoder, b: Bool) -> Encoder {
   }
 }
 
-pub fn bytearray(self: Encoder, arr: ByteArray) -> Encoder {
+pub fn bytes(self: Encoder, arr: ByteArray) -> Encoder {
   self |> filler |> byte_array(arr)
 }
 
@@ -61,15 +78,6 @@ pub fn encode_list_with(
       list
         |> list.foldl(self, fn(item, acc) { with(one(acc), item) })
         |> zero
-  }
-}
-
-/// Assumes given ByteArray is a single byte.
-pub fn unsafe_u8(self: Encoder, u8: ByteArray) -> Encoder {
-  if self.used_bits == 0 {
-    next_word(Encoder { ..self, current_byte: u8 })
-  } else {
-    byte_unaligned(self, u8)
   }
 }
 

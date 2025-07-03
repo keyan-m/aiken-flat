@@ -10,6 +10,14 @@ pub opaque type Decoder {
   pos: Int,
 }
 
+pub fn new(bytes: ByteArray) -> Decoder {
+  Decoder {
+    buffer: bytes,
+    used_bits: 0,
+    pos: 0,
+  }
+}
+
 pub fn integer(self: Decoder) -> (Int, Decoder) {
   let (w, new_decoder) = self |> word
   (zag_zig(w), new_decoder)
