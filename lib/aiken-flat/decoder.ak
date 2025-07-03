@@ -11,11 +11,7 @@ pub opaque type Decoder {
 }
 
 pub fn new(bytes: ByteArray) -> Decoder {
-  Decoder {
-    buffer: bytes,
-    used_bits: 0,
-    pos: 0,
-  }
+  Decoder { buffer: bytes, used_bits: 0, pos: 0 }
 }
 
 pub fn integer(self: Decoder) -> (Int, Decoder) {

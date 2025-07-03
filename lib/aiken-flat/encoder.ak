@@ -13,11 +13,7 @@ pub opaque type Encoder {
 }
 
 pub fn new() -> Encoder {
-  Encoder {
-    buffer: #"",
-    used_bits: 0,
-    current_byte: #"00",
-  }
+  Encoder { buffer: #"", used_bits: 0, current_byte: #"00" }
 }
 
 /// Assumes given ByteArray is a single byte.
@@ -95,7 +91,7 @@ fn bits(self: Encoder, bits: Bits) -> Encoder {
       )
 }
 
-fn filler(self: Encoder) -> Encoder {
+pub fn filler(self: Encoder) -> Encoder {
   Encoder {
     ..self,
     current_byte: self.current_byte |> builtin.or_bytearray(False, _, #"01"),
