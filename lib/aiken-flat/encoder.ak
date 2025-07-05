@@ -51,14 +51,13 @@ pub fn integer(self: Encoder, x: Int) -> Encoder {
 
 fn do_word(self: Encoder, d: ByteArray) -> Encoder {
   let w = builtin.and_bytearray(False, d, #"7f")
-  let d = d |> builtin.shift_bytearray(-7)
-  if d != #"00" {
-    let w = builtin.or_bytearray(False, w, #"80")
-    let new_encoder = self |> bits(bits.from_bytearray(w))
-    do_word(new_encoder, d)
+  let shifted_d = d |> builtin.shift_bytearray(-7)
+  if shifted_d != #"00" {
+    let new_w = builtin.or_bytearray(False, w, #"80")
+    let new_encoder = self |> bits(bits.from_bytearray(new_w))
+    do_word(new_encoder, shifted_d)
   } else {
-    let new_encoder = self |> bits(bits.from_bytearray(w))
-    do_word(new_encoder, d)
+    self |> bits(bits.from_bytearray(w))
   }
 }
 
@@ -80,7 +79,7 @@ pub fn encode_list_with(
   }
 }
 
-fn bits(self: Encoder, bits: Bits) -> Encoder {
+pub fn bits(self: Encoder, bits: Bits) -> Encoder {
   bits
     |> list.foldl(
         self,

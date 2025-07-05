@@ -57,7 +57,7 @@ fn do_word(
   final_word: ByteArray,
   shl: Integer,
 ) -> (Int, Decoder) {
-  if leading_bit == #"01" {
+  if bytearray.compare(leading_bit, #"00") == Greater {
     let (word8, new_decoder) = self |> bits8(8)
     let word7 = builtin.and_bytearray(False, word8, #"7f")
     let new_final_word =

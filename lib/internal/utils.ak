@@ -1,3 +1,4 @@
+use aiken/collection/list
 use aiken/primitive/bytearray
 
 pub fn zip_foldr(
@@ -31,7 +32,7 @@ fn do_chunks(
     do_chunks(
       bytes |> bytearray.drop(chunk_length),
       chunk_length,
-      [left, ..acc],
+      list.concat(acc, [left]),
     )
   }
 }
