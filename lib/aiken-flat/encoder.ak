@@ -12,8 +12,11 @@ pub opaque type Encoder {
   current_byte: ByteArray,
 }
 
-pub fn new() -> Encoder {
+pub const new: Encoder =
   Encoder { buffer: #"", used_bits: 0, current_byte: #"00" }
+
+pub fn unwrap(self: Encoder) -> ByteArray {
+  self.buffer
 }
 
 /// Assumes given ByteArray is a single byte.

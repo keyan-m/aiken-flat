@@ -14,6 +14,10 @@ pub fn new(bytes: ByteArray) -> Decoder {
   Decoder { buffer: bytes, used_bits: 0, pos: 0 }
 }
 
+pub fn unwrap(decoder_res: (a, Decoder)) -> a {
+  decoder_res.1st
+}
+
 pub fn integer(self: Decoder) -> (Int, Decoder) {
   let (w, new_decoder) = self |> word
   (zag_zig(w), new_decoder)
@@ -82,7 +86,7 @@ fn do_decode_list_with(
   decoder_func: fn(Decoder) -> (a, Decoder),
   acc: List<a>,
 ) -> List<a> {
-  let (current_bit, _) = self |> bit()
+  let (current_bit, _) = self |> bit
   if current_bit {
     let (decoded, new_decoder) = self |> decoder_func
     do_decode_list_with(new_decoder, decoder_func, list.concat(acc, [decoded]))
@@ -92,23 +96,23 @@ fn do_decode_list_with(
 }
 
 fn zero(self: Decoder) -> (Bool, Decoder) {
-  let (current_bit, new_decoder) = self |> bit()
+  let (current_bit, new_decoder) = self |> bit
   (!current_bit, new_decoder)
 }
 
 fn bit(self: Decoder) -> (Bool, Decoder) {
   let Decoder { buffer, used_bits, pos } = self
-  let b =
-    (
-      builtin.and_bytearray(
-        False,
-        buffer |> get_byte_at(pos),
-        builtin.shift_bytearray(#"80", -used_bits),
-      )
-        |> bytearray.compare(#"00")
-    ) == Greater
+  // `get_byte_at` uses `bytearray.at` under the hood, which itself fails if
+  // given index is out of bounds. So no need to validate that `pos` is not less
+  // than `buffer`'s length.
+  let current_byte = buffer |> get_byte_at(pos)
+  let byte_with_current_bit_on = builtin.shift_bytearray(#"80", -used_bits)
+  let current_bit_as_byte =
+    builtin.and_bytearray(False, current_byte, byte_with_current_bit_on)
+  let current_bit_is_on =
+    ( current_bit_as_byte |> bytearray.compare(#"00") ) == Greater
 
-  (b, self |> increment_buffer_by_bit)
+  (current_bit_is_on, self |> increment_buffer_by_bit)
 }
 
 fn do_byte_array(
@@ -117,7 +121,7 @@ fn do_byte_array(
 ) -> (ByteArray, Decoder) {
   let Decoder { buffer, used_bits, pos } = self
 
-  expect used_bits != 0
+  expect used_bits == 0
 
   // `bytearray.at` fails if `pos` is out of bounds, so no need for
   // `ensure_bytes` here.
@@ -128,13 +132,15 @@ fn do_byte_array(
   if chunk_len != 0 {
     expect self |> ensure_bytes(chunk_len + 1)
 
-    let decoded_chunk = buffer |> bytearray.slice(pos, pos + chunk_len)
+    let pos_after_chunk = new_pos + chunk_len
+
+    let decoded_chunk = buffer |> bytearray.slice(new_pos, pos_after_chunk - 1)
 
     let updated_decoded_array =
       bytearray.concat(decoded_array_so_far, decoded_chunk)
 
     do_byte_array(
-      Decoder { ..self, pos: new_pos + chunk_len },
+      Decoder { ..self, pos: pos_after_chunk },
       updated_decoded_array,
     )
   } else {
@@ -142,11 +148,11 @@ fn do_byte_array(
   }
 }
 
-fn byte_array(self: Decoder) -> (ByteArray, Decoder) {
+pub fn byte_array(self: Decoder) -> (ByteArray, Decoder) {
   do_byte_array(self, #"")
 }
 
-/// Second output is a single byte.
+/// First output is a single byte.
 pub fn bits8(self: Decoder, n: Int) -> (ByteArray, Decoder) {
   expect n <= 8
 
