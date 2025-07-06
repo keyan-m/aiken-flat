@@ -50,6 +50,10 @@ pub fn to_bytearray(x: Integer) -> ByteArray {
   x.value |> bytearray.from_int_big_endian(x.size)
 }
 
+pub fn from_bytearray(bytes: ByteArray) -> Integer {
+  bytes |> builtin.bytearray_to_integer(True, _) |> from_int
+}
+
 pub fn shift_right(x: Integer, bit_count: Int) -> Integer {
   x
     |> to_bytearray
@@ -61,6 +65,7 @@ pub fn shift_right(x: Integer, bit_count: Int) -> Integer {
 /// Assumes x is positive, and finds the number of bytes needed to represent
 /// given number.
 fn do_find_byte_count(x: Int, count_so_far: Int) -> Int {
+  expect x >= 0
   if x < 256 {
     count_so_far
   } else {

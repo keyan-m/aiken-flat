@@ -50,14 +50,16 @@ pub fn integer(self: Encoder, x: Int) -> Encoder {
 }
 
 fn do_word(self: Encoder, d: ByteArray) -> Encoder {
-  let w = builtin.and_bytearray(False, d, #"7f")
+  let w = builtin.and_bytearray(True, d, #"7f")
+  let w = w |> integer.from_bytearray |> integer.to_bytearray
   let shifted_d = d |> builtin.shift_bytearray(-7)
-  if shifted_d != #"00" {
+  if builtin.bytearray_to_integer(True, shifted_d) != 0 {
     let new_w = builtin.or_bytearray(False, w, #"80")
     let new_encoder = self |> bits(bits.from_bytearray(new_w))
     do_word(new_encoder, shifted_d)
   } else {
-    self |> bits(bits.from_bytearray(w))
+    let res = self |> bits(bits.from_bytearray(w))
+    res
   }
 }
 

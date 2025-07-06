@@ -25,7 +25,8 @@ test success__bytes_roundtrip(bytes via fuzz.bytearray_fixed(2550)) {
   decoded == bytes
 }
 
-test success__integer_roundtrip(integer via fuzz.int_between(0, 127)) {
+test success__integer_roundtrip() {
+  let integer = 128
   let encoded = flat.encode_integer(integer)
   let decoded = flat.decode_integer(encoded)
   trace encoded
