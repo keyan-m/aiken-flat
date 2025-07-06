@@ -58,3 +58,22 @@ fn do_leading_zeros(arr: ByteArray, count_so_far: Int) -> Int {
     do_leading_zeros(arr |> bytearray.drop(1), count_so_far + 8)
   }
 }
+
+pub fn left_zero_pad_to_match(
+  left: ByteArray,
+  right: ByteArray,
+) -> (ByteArray, ByteArray) {
+  let left_length = bytearray.length(left)
+  let right_length = bytearray.length(right)
+  if left_length < right_length {
+    let padding_length = right_length - left_length
+    (left |> zero_left_pad_by(padding_length), right)
+  } else {
+    let padding_length = left_length - right_length
+    (left, right |> zero_left_pad_by(padding_length))
+  }
+}
+
+pub fn zero_left_pad_by(self: ByteArray, padding_length: Int) -> ByteArray {
+  bytearray.concat(repeat(#"00", padding_length), self)
+}

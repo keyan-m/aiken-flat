@@ -1,5 +1,7 @@
+use aiken/builtin
 use aiken/fuzz
 use aiken_flat/flat
+use internal/extra/bytearray as ba_extra
 
 test success__bool_roundtrip(b via fuzz.bool()) {
   let encoded = flat.encode_bool(b)
@@ -32,4 +34,9 @@ test success__integer_roundtrip() {
   trace encoded
   trace decoded
   decoded == integer
+}
+
+test success__and() {
+  let (left, right) = ba_extra.left_zero_pad_to_match(#"0100", #"7f")
+  builtin.and_bytearray(True, left, right) == #"0000"
 }

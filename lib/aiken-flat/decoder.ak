@@ -58,40 +58,19 @@ fn do_word(
   final_word: ByteArray,
   shl: Integer,
 ) -> (Int, Decoder) {
-  trace @"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-  trace @"self"
-  trace self
-  trace @"leading_bit"
-  trace leading_bit
-  trace @"final_word"
-  trace final_word
-  trace @"shl"
-  trace shl
   if bytearray.compare(leading_bit, #"00") == Greater {
-    trace @"IF"
     let (word8, new_decoder) = self |> bits8(8)
-    trace @"word8"
-    trace word8
-    trace @"new_decoder"
-    trace new_decoder
     let word7 = builtin.and_bytearray(True, word8, #"7f")
-    trace @"word7"
-    trace word7
+    let shifted_word7 = ba_extra.shift_left(word7, shl |> integer.to_int)
+    let (padded_final_word, padded_shifted_word7) =
+      ba_extra.left_zero_pad_to_match(final_word, shifted_word7)
     let new_final_word =
-      builtin.or_bytearray(
-        True,
-        final_word,
-        ba_extra.shift_left(word7, shl |> integer.to_int),
-      )
+      builtin.or_bytearray(False, padded_final_word, padded_shifted_word7)
     let new_shl = shl |> integer.add_int(7)
     let new_leading_bit = builtin.and_bytearray(True, word8, #"80")
-    trace @"~~~~~~~~~~~~~~~~~~"
     do_word(new_decoder, new_leading_bit, new_final_word, new_shl)
   } else {
     let res = (builtin.bytearray_to_integer(True, final_word), self)
-    trace @"res"
-    trace res
-    trace @"~~~~~~~~~~~~~~~~~~"
     res
   }
 }

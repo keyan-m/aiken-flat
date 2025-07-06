@@ -2,8 +2,8 @@ use aiken/builtin
 use aiken/collection/list
 use aiken/primitive/bytearray
 use aiken_flat/bits.{Bits}
-use aiken_flat/primitive/integer
 use aiken_flat/zig_zag.{zig_zag}
+use internal/extra/bytearray as ba_extra
 use internal/utils.{bytearray_chunks}
 
 pub opaque type Encoder {
@@ -50,21 +50,56 @@ pub fn integer(self: Encoder, x: Int) -> Encoder {
 }
 
 fn do_word(self: Encoder, d: ByteArray) -> Encoder {
-  let w = builtin.and_bytearray(True, d, #"7f")
-  let w = w |> integer.from_bytearray |> integer.to_bytearray
+  let (_, padded_7f) = ba_extra.left_zero_pad_to_match(d, #"7f")
+  let w = builtin.and_bytearray(False, d, padded_7f)
+  let w =
+    builtin.bytearray_to_integer(True, w)
+      |> builtin.integer_to_bytearray(True, 0, _)
+      |> builtin.or_bytearray(True, _, #"00")
   let shifted_d = d |> builtin.shift_bytearray(-7)
-  if builtin.bytearray_to_integer(True, shifted_d) != 0 {
+  let int_shifted_d = builtin.bytearray_to_integer(True, shifted_d)
+  let shifted_d =
+    int_shifted_d
+      |> builtin.integer_to_bytearray(True, 0, _)
+      |> builtin.or_bytearray(True, _, #"00")
+  trace @"self"
+  trace self
+  trace @"d"
+  trace d
+  trace @"w"
+  trace w
+  trace @"shifted_d"
+  trace shifted_d
+  if int_shifted_d != 0 {
+    let (_, padded_80) = ba_extra.left_zero_pad_to_match(w, #"80")
     let new_w = builtin.or_bytearray(False, w, #"80")
-    let new_encoder = self |> bits(bits.from_bytearray(new_w))
-    do_word(new_encoder, shifted_d)
+    let new_w_bits = bits.from_bytearray(new_w)
+    let new_encoder = self |> bits(new_w_bits)
+    trace @"new_w"
+    trace new_w
+    trace @"new_encoder"
+    trace new_encoder
+    // do_word(
+    //   new_encoder,
+    //   shifted_d,
+    // )
+    fail
   } else {
-    let res = self |> bits(bits.from_bytearray(w))
-    res
+    let w_bits = bits.from_bytearray(w)
+    self |> bits(w_bits)
   }
 }
 
+test temp() {
+  let x =
+    do_word(Encoder { buffer: #"80", used_bits: 0, current_byte: #"00" }, #"02")
+  trace x
+  False
+}
+
 pub fn word(self: Encoder, x: Int) -> Encoder {
-  self |> do_word(x |> integer.from_int |> integer.to_bytearray)
+  // Size of `0` is equivalent to minimum required byte count.
+  self |> do_word(builtin.integer_to_bytearray(True, 0, x))
 }
 
 pub fn encode_list_with(
