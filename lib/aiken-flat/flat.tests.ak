@@ -1,7 +1,6 @@
-use aiken/builtin
 use aiken/fuzz
 use aiken_flat/flat
-use internal/extra/bytearray as ba_extra
+use internal/utils.{i128_max_bound, i128_min_bound}
 
 test success__bool_roundtrip(b via fuzz.bool()) {
   let encoded = flat.encode_bool(b)
@@ -27,16 +26,12 @@ test success__bytes_roundtrip(bytes via fuzz.bytearray_fixed(2550)) {
   decoded == bytes
 }
 
-test success__integer_roundtrip() {
-  let integer = 128
+test success__integer_roundtrip(
+  integer via fuzz.int_between(i128_min_bound, i128_max_bound),
+) {
   let encoded = flat.encode_integer(integer)
   let decoded = flat.decode_integer(encoded)
   trace encoded
   trace decoded
   decoded == integer
-}
-
-test success__and() {
-  let (left, right) = ba_extra.left_zero_pad_to_match(#"0100", #"7f")
-  builtin.and_bytearray(True, left, right) == #"0000"
 }

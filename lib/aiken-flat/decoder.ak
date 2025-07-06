@@ -1,7 +1,6 @@
 use aiken/builtin
 use aiken/collection/list
 use aiken/primitive/bytearray
-use aiken_flat/primitive/integer.{Integer}
 use aiken_flat/zig_zag.{zag_zig}
 use internal/extra/bytearray as ba_extra
 
@@ -48,7 +47,7 @@ pub fn filler(self: Decoder) -> Decoder {
 pub fn word(self: Decoder) -> (Int, Decoder) {
   let leading_bit = #"01"
   let final_word = #"00"
-  let shl = integer.zero
+  let shl = 0
   do_word(self, leading_bit, final_word, shl)
 }
 
@@ -56,17 +55,18 @@ fn do_word(
   self: Decoder,
   leading_bit: ByteArray,
   final_word: ByteArray,
-  shl: Integer,
+  shl: Int,
 ) -> (Int, Decoder) {
-  if bytearray.compare(leading_bit, #"00") == Greater {
+  let int_leading_bit = builtin.bytearray_to_integer(True, leading_bit)
+  if int_leading_bit > 0 {
     let (word8, new_decoder) = self |> bits8(8)
-    let word7 = builtin.and_bytearray(True, word8, #"7f")
-    let shifted_word7 = ba_extra.shift_left(word7, shl |> integer.to_int)
+    let word7 = builtin.and_bytearray(False, word8, #"7f")
+    let shifted_word7 = ba_extra.shift_left(word7, shl)
     let (padded_final_word, padded_shifted_word7) =
       ba_extra.left_zero_pad_to_match(final_word, shifted_word7)
     let new_final_word =
       builtin.or_bytearray(False, padded_final_word, padded_shifted_word7)
-    let new_shl = shl |> integer.add_int(7)
+    let new_shl = shl + 7
     let new_leading_bit = builtin.and_bytearray(True, word8, #"80")
     do_word(new_decoder, new_leading_bit, new_final_word, new_shl)
   } else {

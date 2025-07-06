@@ -7,7 +7,7 @@ pub fn shift_left(arr: ByteArray, shift: Int) -> ByteArray {
     arr |> builtin.shift_bytearray(shift)
   } else {
     let extra_bytes = ( shift - available_bits ) / 8 + 1
-    let padded = repeat(#"00", shift - available_bits) |> bytearray.concat(arr)
+    let padded = repeat(#"00", extra_bytes) |> bytearray.concat(arr)
     padded |> builtin.shift_bytearray(shift)
   }
 }
@@ -30,7 +30,9 @@ pub fn leading_zeroes(arr: ByteArray) -> Int {
 
 fn do_leading_zeros(arr: ByteArray, count_so_far: Int) -> Int {
   let leading_byte = arr |> bytearray.take(1)
-  if bytearray.compare(leading_byte, #"7f") == Greater {
+  if bytearray.is_empty(arr) {
+    count_so_far
+  } else if bytearray.compare(leading_byte, #"7f") == Greater {
     // `arr` is "1xxx xxxx"
     count_so_far
   } else if bytearray.compare(leading_byte, #"3f") == Greater {

@@ -62,39 +62,16 @@ fn do_word(self: Encoder, d: ByteArray) -> Encoder {
     int_shifted_d
       |> builtin.integer_to_bytearray(True, 0, _)
       |> builtin.or_bytearray(True, _, #"00")
-  trace @"self"
-  trace self
-  trace @"d"
-  trace d
-  trace @"w"
-  trace w
-  trace @"shifted_d"
-  trace shifted_d
   if int_shifted_d != 0 {
     let (_, padded_80) = ba_extra.left_zero_pad_to_match(w, #"80")
-    let new_w = builtin.or_bytearray(False, w, #"80")
+    let new_w = builtin.or_bytearray(False, w, padded_80)
     let new_w_bits = bits.from_bytearray(new_w)
     let new_encoder = self |> bits(new_w_bits)
-    trace @"new_w"
-    trace new_w
-    trace @"new_encoder"
-    trace new_encoder
-    // do_word(
-    //   new_encoder,
-    //   shifted_d,
-    // )
-    fail
+    do_word(new_encoder, shifted_d)
   } else {
     let w_bits = bits.from_bytearray(w)
     self |> bits(w_bits)
   }
-}
-
-test temp() {
-  let x =
-    do_word(Encoder { buffer: #"80", used_bits: 0, current_byte: #"00" }, #"02")
-  trace x
-  False
 }
 
 pub fn word(self: Encoder, x: Int) -> Encoder {
@@ -131,9 +108,11 @@ pub fn bits(self: Encoder, bits: Bits) -> Encoder {
 }
 
 pub fn filler(self: Encoder) -> Encoder {
+  let (padded_current_byte, padded_01) =
+    ba_extra.left_zero_pad_to_match(self.current_byte, #"01")
   Encoder {
     ..self,
-    current_byte: self.current_byte |> builtin.or_bytearray(False, _, #"01"),
+    current_byte: builtin.or_bytearray(True, padded_current_byte, padded_01),
   }
     |> next_word
 }
