@@ -1,4 +1,4 @@
-use aiken/builtin
+use aiken/builtin.{head_list, tail_list}
 use aiken/collection/list
 use aiken/primitive/bytearray
 use aiken_flat/bits.{Bits}
@@ -12,12 +12,21 @@ pub opaque type Encoder {
   current_byte: ByteArray,
 }
 
+type EncoderFn<a> =
+  fn(Encoder, a) -> Encoder
+
 pub const new: Encoder =
   Encoder { buffer: #"", used_bits: 0, current_byte: #"00" }
 
 pub fn unwrap(self: Encoder) -> ByteArray {
   self.buffer
 }
+
+pub const identity_encoder_fn_selector =
+  fn(_: Int) -> EncoderFn<Data> { fn(self, _) { self } }
+
+pub const identity_encoder_fn_selector_factory =
+  fn(_: Int) { identity_encoder_fn_selector }
 
 /// Assumes given ByteArray is a single byte.
 pub fn unsafe_u8(self: Encoder, u8: ByteArray) -> Encoder {
@@ -191,3 +200,508 @@ fn unsafe_write_blk(self: Encoder, arr: ByteArray) -> Encoder {
         )
   Encoder { ..self, buffer: bytearray.concat(buffer_before_0, #"00") }
 }
+
+// ## Custom Type Encoders
+// 
+// We're using `Data` here since Aiken does not support downcasting a
+// polymorphic type yet.
+
+/// Helper for making encoder for a record type with 2 fields. More performant
+/// than using `make_rec`.
+pub fn make_rec_2(
+  f0_encoder: EncoderFn<Data>,
+  f1_encoder: EncoderFn<Data>,
+) -> EncoderFn<List<Data>> {
+  fn(self: Encoder, fields: List<Data>) -> Encoder {
+    self
+      |> f0_encoder(fields |> head_list)
+      |> f1_encoder(fields |> tail_list |> head_list)
+  }
+}
+
+/// Helper for making encoder for a record type with 3 fields. More performant
+/// than using `make_rec`.
+pub fn make_rec_3(
+  f0_encoder: EncoderFn<Data>,
+  f1_encoder: EncoderFn<Data>,
+  f2_encoder: EncoderFn<Data>,
+) -> EncoderFn<List<Data>> {
+  fn(self: Encoder, fields: List<Data>) -> Encoder {
+    self
+      |> f0_encoder(fields |> head_list)
+      |> f1_encoder(fields |> tail_list |> head_list)
+      |> f2_encoder(fields |> tail_list |> tail_list |> head_list)
+  }
+}
+
+/// Helper for creating record type encoders. The resulting encoder traverses a
+/// list of `Data` values and uses their indices to find their corresponding
+/// encoders from the provided selector function.
+pub fn make_rec(
+  encoder_fn_selector: fn(Int) -> EncoderFn<Data>,
+) -> EncoderFn<List<Data>> {
+  fn(self: Encoder, fields: List<Data>) -> Encoder {
+    let
+      _,
+      final_encoder,
+    <-
+      list.foldl2(
+        fields,
+        0,
+        self,
+        fn(field_data: Data, curr_index: Int, acc: Encoder, return) {
+          let f_encoder = encoder_fn_selector(curr_index)
+          return(curr_index + 1, acc |> f_encoder(field_data))
+        },
+      )
+    final_encoder
+  }
+}
+
+/// Encoder for a generic sum type with 2 data constructors, and arbitrary
+/// fields in each. More performant than using [`make_sum`](#make_sum).
+pub fn sum_2(
+  self: Encoder,
+  c0_encoders: fn(Int) -> EncoderFn<Data>,
+  c1_encoders: fn(Int) -> EncoderFn<Data>,
+  d: Data,
+) -> Encoder {
+  let Pair(tag, fields) = builtin.un_constr_data(d)
+  if tag == 0 {
+    self |> zero |> make_rec(c0_encoders)(fields)
+  } else {
+    self |> one |> make_rec(c1_encoders)(fields)
+  }
+}
+
+/// Encoder for a generic sum type with 3 data constructors, and arbitrary
+/// fields in each. More performant than using [`make_sum`](#make_sum).
+pub fn sum_3(
+  self: Encoder,
+  c0_encoders: fn(Int) -> EncoderFn<Data>,
+  c1_encoders: fn(Int) -> EncoderFn<Data>,
+  c2_encoders: fn(Int) -> EncoderFn<Data>,
+  d: Data,
+) -> Encoder {
+  let Pair(tag, fields) = builtin.un_constr_data(d)
+  if tag == 0 {
+    self |> zero |> make_rec(c0_encoders)(fields)
+  } else if tag == 1 {
+    self |> one |> zero |> make_rec(c1_encoders)(fields)
+  } else {
+    self |> one |> one |> make_rec(c2_encoders)(fields)
+  }
+}
+
+/// Encoder for a generic sum type with 4 data constructors, and arbitrary
+/// fields in each. More performant than using [`make_sum`](#make_sum).
+pub fn sum_4(
+  self: Encoder,
+  c0_encoders: fn(Int) -> EncoderFn<Data>,
+  c1_encoders: fn(Int) -> EncoderFn<Data>,
+  c2_encoders: fn(Int) -> EncoderFn<Data>,
+  c3_encoders: fn(Int) -> EncoderFn<Data>,
+  d: Data,
+) -> Encoder {
+  let Pair(tag, fields) = builtin.un_constr_data(d)
+  if tag == 0 {
+    self |> zero |> zero |> make_rec(c0_encoders)(fields)
+  } else if tag == 1 {
+    self |> zero |> one |> make_rec(c1_encoders)(fields)
+  } else if tag == 2 {
+    self |> one |> zero |> make_rec(c2_encoders)(fields)
+  } else {
+    self |> one |> one |> make_rec(c3_encoders)(fields)
+  }
+}
+
+/// `tag` is zero-indexed. So for a datatype like:
+/// ```ak
+/// pub type Direction {
+///   North  // tag == 0
+///   South  // tag == 1
+///   Center // tag == 2
+///   East   // tag == 3
+///   West   // tag == 4
+/// }
+/// ```
+/// `constr_count` will be `5`.
+///
+/// Note that the resulting `Bits` is in reverse order.
+fn do_tag_to_bits(constr_count: Int, tag: Int, so_far: Bits) -> Bits {
+  let halved = constr_count / 2
+  if halved <= 0 {
+    so_far
+  } else if halved == 1 {
+    if constr_count == 3 {
+      if tag == 0 {
+        so_far |> list.push(False)
+      } else if tag == 1 {
+        so_far |> list.push(True) |> list.push(False)
+      } else {
+        so_far |> list.push(True) |> list.push(True)
+      }
+    } else {
+      if tag == 0 {
+        so_far |> list.push(False)
+      } else {
+        so_far |> list.push(True)
+      }
+    }
+  } else {
+    if tag < halved {
+      do_tag_to_bits(halved, tag, so_far |> list.push(False))
+    } else {
+      let new_constr =
+        if constr_count % 2 == 0 {
+          halved
+        } else {
+          halved + 1
+        }
+      do_tag_to_bits(new_constr, tag - halved, so_far |> list.push(True))
+    }
+  }
+}
+
+/// Helper function for finding Flat `Bits` of a generic sum type's data
+/// constructor. This leverages the `Data` type from UPLC for extracting the
+/// `Constr` tag.
+///
+/// Not enforced, but only `constr_count` values greater than or equal to `1`
+/// make sense, with `tag` being less than or equal to `constr_count - 1`.
+/// `constr_count`s less than or equal to `1` yield an empty list, while a
+/// negative `tag` leads to infinite recursion.
+fn tag_to_bits(constr_count: Int, tag: Int) -> Bits {
+  do_tag_to_bits(constr_count, tag, []) |> list.reverse
+}
+
+/// Helper function for generating encoders for sum types. The factory is
+/// expected to be a function that takes an index, which is the index of the
+/// constructor in the subject sum type, and returns another function that given
+/// the index of a field from the record, returns an encoder function.
+///
+/// An example can be:
+/// ```ak
+/// pub type Colored {
+///   BlackAndWhite {
+///     white: Int,
+///   }
+///   Color {
+///     red: Int,
+///     green: Int,
+///     blue: Int,
+///   }
+/// }
+/// ```
+/// The factory function for this datatype should be:
+/// ```ak
+/// let colored_factory = fn(tag: Int) {
+///   if tag == 0 {
+///     fn(f_index: Int) {
+///       if f_index == 0 {
+///         integer
+///       } else {
+///         fail
+///       }
+///     }
+///   } else if tag == 1 {
+///     fn(f_index: Int) {
+///       if f_index <= 2 {
+///         integer // `integer` encoder in this module
+///       } else {
+///         fail
+///       }
+///     }
+///   } else {
+///     fail
+///   }
+/// }
+/// ```
+/// In this case, it can be much simpler if we forgo the strictness:
+/// ```ak
+/// let colored_factory = fn(_) { fn(_) { integer } }
+/// ```
+/// And the encoder itself will be:
+/// ```ak
+/// let colored_encoder = make_sum(2, colored_factory)
+/// ```
+pub fn make_sum(
+  constr_count: Int,
+  encoder_fn_selector_factory: fn(Int) -> fn(Int) -> EncoderFn<Data>,
+) -> EncoderFn<Data> {
+  fn(self: Encoder, d: Data) -> Encoder {
+    let Pair(tag, fields) = builtin.un_constr_data(d)
+    let tag_bits = tag_to_bits(constr_count, tag)
+    self |> bits(tag_bits) |> make_rec(encoder_fn_selector_factory(tag))(fields)
+  }
+}
+
+// ## Tests
+// Correct values acquired with Haskell's `flat` library.
+// {{{
+
+/// Datatype from the specs.
+type Direction {
+  North
+  South
+  Center
+  East
+  West
+}
+
+/// `current_byte`s are occupied from left to right on a `#"00"`, so a `0b1`
+/// would yield a `used_bits == 1` and `current_byte` of `#"80"`.
+///
+/// ```
+/// North  ─▶ 0b00  ─▶ 0000 0000 ─▶ #"00"
+/// South  ─▶ 0b01  ─▶ 0100 0000 ─▶ #"40"
+/// Center ─▶ 0b100 ─▶ 1000 0000 ─▶ #"80"
+/// East   ─▶ 0b110 ─▶ 1100 0000 ─▶ #"C0"
+/// West   ─▶ 0b111 ─▶ 1110 0000 ─▶ #"E0"
+/// ```
+test success__direction() {
+  let direction_encoder = make_sum(5, identity_encoder_fn_selector_factory)
+  let north = new |> direction_encoder(North)
+  let south = new |> direction_encoder(South)
+  let center = new |> direction_encoder(Center)
+  let east = new |> direction_encoder(East)
+  let west = new |> direction_encoder(West)
+  trace north
+  trace south
+  trace center
+  trace east
+  trace west
+  and {
+    north.used_bits == 2,
+    north.current_byte == #"00",
+    south.used_bits == 2,
+    south.current_byte == #"40",
+    center.used_bits == 2,
+    center.current_byte == #"80",
+    east.used_bits == 3,
+    east.current_byte == #"c0",
+    west.used_bits == 3,
+    west.current_byte == #"e0",
+  }
+}
+
+test success_tag_to_bits_C20() {
+  let result = tag_to_bits(2, 0)
+  result == [False]
+}
+
+test success_tag_to_bits_C21() {
+  let result = tag_to_bits(2, 1)
+  result == [True]
+}
+
+test success_tag_to_bits_C30() {
+  let result = tag_to_bits(3, 0)
+  result == [False]
+}
+
+test success_tag_to_bits_C31() {
+  let result = tag_to_bits(3, 1)
+  result == [True, False]
+}
+
+test success_tag_to_bits_C32() {
+  let result = tag_to_bits(3, 2)
+  result == [True, True]
+}
+
+test success_tag_to_bits_C40() {
+  let result = tag_to_bits(4, 0)
+  result == [False, False]
+}
+
+test success_tag_to_bits_C41() {
+  let result = tag_to_bits(4, 1)
+  result == [False, True]
+}
+
+test success_tag_to_bits_C42() {
+  let result = tag_to_bits(4, 2)
+  result == [True, False]
+}
+
+test success_tag_to_bits_C43() {
+  let result = tag_to_bits(4, 3)
+  result == [True, True]
+}
+
+test success_tag_to_bits_C50() {
+  let result = tag_to_bits(5, 0)
+  result == [False, False]
+}
+
+test success_tag_to_bits_C51() {
+  let result = tag_to_bits(5, 1)
+  result == [False, True]
+}
+
+test success_tag_to_bits_C52() {
+  let result = tag_to_bits(5, 2)
+  result == [True, False]
+}
+
+test success_tag_to_bits_C53() {
+  let result = tag_to_bits(5, 3)
+  result == [True, True, False]
+}
+
+test success_tag_to_bits_C54() {
+  let result = tag_to_bits(5, 4)
+  result == [True, True, True]
+}
+
+test success_tag_to_bits_C60() {
+  let result = tag_to_bits(6, 0)
+  result == [False, False]
+}
+
+test success_tag_to_bits_C61() {
+  let result = tag_to_bits(6, 1)
+  result == [False, True, False]
+}
+
+test success_tag_to_bits_C62() {
+  let result = tag_to_bits(6, 2)
+  result == [False, True, True]
+}
+
+test success_tag_to_bits_C63() {
+  let result = tag_to_bits(6, 3)
+  result == [True, False]
+}
+
+test success_tag_to_bits_C64() {
+  let result = tag_to_bits(6, 4)
+  result == [True, True, False]
+}
+
+test success_tag_to_bits_C65() {
+  let result = tag_to_bits(6, 5)
+  result == [True, True, True]
+}
+
+test success_tag_to_bits_C70() {
+  let result = tag_to_bits(7, 0)
+  result == [False, False]
+}
+
+test success_tag_to_bits_C71() {
+  let result = tag_to_bits(7, 1)
+  result == [False, True, False]
+}
+
+test success_tag_to_bits_C72() {
+  let result = tag_to_bits(7, 2)
+  result == [False, True, True]
+}
+
+test success_tag_to_bits_C73() {
+  let result = tag_to_bits(7, 3)
+  result == [True, False, False]
+}
+
+test success_tag_to_bits_C74() {
+  let result = tag_to_bits(7, 4)
+  result == [True, False, True]
+}
+
+test success_tag_to_bits_C75() {
+  let result = tag_to_bits(7, 5)
+  result == [True, True, False]
+}
+
+test success_tag_to_bits_C76() {
+  let result = tag_to_bits(7, 6)
+  result == [True, True, True]
+}
+
+test success_tag_to_bits_C80() {
+  let result = tag_to_bits(8, 0)
+  result == [False, False, False]
+}
+
+test success_tag_to_bits_C81() {
+  let result = tag_to_bits(8, 1)
+  result == [False, False, True]
+}
+
+test success_tag_to_bits_C82() {
+  let result = tag_to_bits(8, 2)
+  result == [False, True, False]
+}
+
+test success_tag_to_bits_C83() {
+  let result = tag_to_bits(8, 3)
+  result == [False, True, True]
+}
+
+test success_tag_to_bits_C84() {
+  let result = tag_to_bits(8, 4)
+  result == [True, False, False]
+}
+
+test success_tag_to_bits_C85() {
+  let result = tag_to_bits(8, 5)
+  result == [True, False, True]
+}
+
+test success_tag_to_bits_C86() {
+  let result = tag_to_bits(8, 6)
+  result == [True, True, False]
+}
+
+test success_tag_to_bits_C87() {
+  let result = tag_to_bits(8, 7)
+  result == [True, True, True]
+}
+
+test success_tag_to_bits_C90() {
+  let result = tag_to_bits(9, 0)
+  result == [False, False, False]
+}
+
+test success_tag_to_bits_C91() {
+  let result = tag_to_bits(9, 1)
+  result == [False, False, True]
+}
+
+test success_tag_to_bits_C92() {
+  let result = tag_to_bits(9, 2)
+  result == [False, True, False]
+}
+
+test success_tag_to_bits_C93() {
+  let result = tag_to_bits(9, 3)
+  result == [False, True, True]
+}
+
+test success_tag_to_bits_C94() {
+  let result = tag_to_bits(9, 4)
+  result == [True, False, False]
+}
+
+test success_tag_to_bits_C95() {
+  let result = tag_to_bits(9, 5)
+  result == [True, False, True]
+}
+
+test success_tag_to_bits_C96() {
+  let result = tag_to_bits(9, 6)
+  result == [True, True, False]
+}
+
+test success_tag_to_bits_C97() {
+  let result = tag_to_bits(9, 7)
+  result == [True, True, True, False]
+}
+
+test success_tag_to_bits_C98() {
+  let result = tag_to_bits(9, 8)
+  result == [True, True, True, True]
+}
+// }}}

@@ -26,6 +26,25 @@ pub fn zip_foldr(
   }
 }
 
+pub fn zip_foldl(
+  self: List<a>,
+  bs: List<b>,
+  acc: c,
+  with: fn(a, b, c) -> c,
+) -> c {
+  when self is {
+    [] -> acc
+    [x, ..xs] ->
+      when bs is {
+        [] -> acc
+        [y, ..ys] -> {
+          let c = with(x, y, acc)
+          zip_foldl(xs, ys, c, with)
+        }
+      }
+  }
+}
+
 fn do_chunks(
   bytes: ByteArray,
   chunk_length: Int,
