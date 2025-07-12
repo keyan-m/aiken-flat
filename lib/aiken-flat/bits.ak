@@ -220,3 +220,63 @@ pub fn from_bytearray(bytes: ByteArray) -> Bits {
         },
       )
 }
+
+/// `tag` is zero-indexed. So for a datatype like:
+/// ```aiken
+/// pub type Direction {
+///   North  // tag == 0
+///   South  // tag == 1
+///   Center // tag == 2
+///   East   // tag == 3
+///   West   // tag == 4
+/// }
+/// ```
+/// `constr_count` will be `5`.
+///
+/// Note that the resulting `Bits` here is in reverse order.
+fn do_tag_to_bits(constr_count: Int, tag: Int, so_far: Bits) -> Bits {
+  let halved = constr_count / 2
+  if halved <= 0 {
+    so_far
+  } else if halved == 1 {
+    if constr_count == 3 {
+      if tag == 0 {
+        so_far |> list.push(False)
+      } else if tag == 1 {
+        so_far |> list.push(True) |> list.push(False)
+      } else {
+        so_far |> list.push(True) |> list.push(True)
+      }
+    } else {
+      if tag == 0 {
+        so_far |> list.push(False)
+      } else {
+        so_far |> list.push(True)
+      }
+    }
+  } else {
+    if tag < halved {
+      do_tag_to_bits(halved, tag, so_far |> list.push(False))
+    } else {
+      let new_constr =
+        if constr_count % 2 == 0 {
+          halved
+        } else {
+          halved + 1
+        }
+      do_tag_to_bits(new_constr, tag - halved, so_far |> list.push(True))
+    }
+  }
+}
+
+/// Helper function for finding Flat `Bits` of a generic sum type's data
+/// constructor. This leverages the `Data` type from UPLC for extracting the
+/// `Constr` tag.
+///
+/// Not enforced, but only `constr_count` values greater than or equal to `1`
+/// make sense, with `tag` being less than or equal to `constr_count - 1`.
+/// `constr_count`s less than or equal to `1` yield an empty list, while a
+/// negative `tag` leads to infinite recursion.
+pub fn tag_to_bits(constr_count: Int, tag: Int) -> Bits {
+  do_tag_to_bits(constr_count, tag, []) |> list.reverse
+}
