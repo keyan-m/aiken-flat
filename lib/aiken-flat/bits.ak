@@ -46,12 +46,7 @@ fn op_with_padding(left: Bits, right: Bits, op: fn(Bit, Bit) -> Bit) -> Bits {
   let padded_left = list.repeat(False, max_len - left_len) |> list.concat(left)
   let padded_right =
     list.repeat(False, max_len - right_len) |> list.concat(right)
-  zip_foldr(
-    padded_left,
-    padded_right,
-    [],
-    fn(l, r, acc) { acc |> list.push(op(l, r)) },
-  )
+  zip_foldr(padded_left, padded_right, [], fn(l, r, acc) { [op(l, r), ..acc] })
 }
 
 pub fn op_with_truncation(
@@ -68,7 +63,7 @@ pub fn op_with_truncation(
     truncated_left,
     truncated_right,
     [],
-    fn(l, r, acc) { acc |> list.push(op(l, r)) },
+    fn(l, r, acc) { [op(l, r), ..acc] },
   )
 }
 
@@ -144,7 +139,7 @@ pub fn to_bytearray(bits: Bits) -> ByteArray {
       0,
       [],
       fn(bit, len_so_far, bools_acc, return) {
-        return(len_so_far + 1, list.push(bools_acc, bit))
+        return(len_so_far + 1, [bit, ..bools_acc])
       },
     )
   let padding = ( 8 - len_before_padding % 8 ) % 8
@@ -159,10 +154,7 @@ pub fn to_bytearray(bits: Bits) -> ByteArray {
 
 fn unsafe_bits_from_one_byte(bytearray: ByteArray) -> Bits {
   [7, 6, 5, 4, 3, 2, 1, 0]
-    |> list.foldr(
-        [],
-        fn(i, acc) { acc |> list.push(builtin.read_bit(bytearray, i)) },
-      )
+    |> list.foldr([], fn(i, acc) { [builtin.read_bit(bytearray, i), ..acc] })
 }
 
 test success__unsafe_bits_from_one_byte() {
@@ -256,7 +248,7 @@ fn do_tag_to_bits(constr_count: Int, tag: Int, so_far: Bits) -> Bits {
     }
   } else {
     if tag < halved {
-      do_tag_to_bits(halved, tag, so_far |> list.push(False))
+      do_tag_to_bits(halved, tag, [False, ..so_far])
     } else {
       let new_constr =
         if constr_count % 2 == 0 {
@@ -264,7 +256,7 @@ fn do_tag_to_bits(constr_count: Int, tag: Int, so_far: Bits) -> Bits {
         } else {
           halved + 1
         }
-      do_tag_to_bits(new_constr, tag - halved, so_far |> list.push(True))
+      do_tag_to_bits(new_constr, tag - halved, [True, ..so_far])
     }
   }
 }

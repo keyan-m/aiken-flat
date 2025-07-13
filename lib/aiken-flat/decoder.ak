@@ -1,22 +1,55 @@
 use aiken/builtin
 use aiken/collection/list
 use aiken/primitive/bytearray
+use aiken_flat/bits.{Bits, tag_to_bits}
 use aiken_flat/zig_zag.{zag_zig}
 use internal/extra/bytearray as ba_extra
 
+/// Opaque type for decoding from a stored buffer.
 pub opaque type Decoder {
   buffer: ByteArray,
   used_bits: Int,
   pos: Int,
 }
 
+/// Function type shared by all decoders.
+type DecoderFn<a> =
+  fn(Decoder) -> (a, Decoder)
+
+/// Initiate a decoder.
 pub fn new(bytes: ByteArray) -> Decoder {
   Decoder { buffer: bytes, used_bits: 0, pos: 0 }
 }
 
+// ## Basics
+
+pub fn map_decoded(
+  decoder_res: (a, Decoder),
+  map_fn: fn(a) -> b,
+) -> (b, Decoder) {
+  let (decoded_a, self) = decoder_res
+  (decoded_a |> map_fn, self)
+}
+
+pub fn pipe(
+  decoder_res: (a, Decoder),
+  next_decoder: DecoderFn<b>,
+  monoid: fn(a, b) -> c,
+) -> (c, Decoder) {
+  let (decoded_a, self) = decoder_res
+  let (decoded_b, updated_self) = self |> next_decoder
+  let decoded_c = monoid(decoded_a, decoded_b)
+  (decoded_c, updated_self)
+}
+
+// ## Runners
+
+/// Returns the decoded value.
 pub fn unwrap(decoder_res: (a, Decoder)) -> a {
   decoder_res.1st
 }
+
+// ## Essential Decoders
 
 pub fn integer(self: Decoder) -> (Int, Decoder) {
   let (w, new_decoder) = self |> word
@@ -78,21 +111,22 @@ fn do_word(
 pub fn decode_list_with(
   self: Decoder,
   decoder_func: fn(Decoder) -> (a, Decoder),
-) -> List<a> {
+) -> (List<a>, Decoder) {
   do_decode_list_with(self, decoder_func, [])
+    |> map_decoded(list.reverse)
 }
 
 fn do_decode_list_with(
   self: Decoder,
-  decoder_func: fn(Decoder) -> (a, Decoder),
+  decoder_fn: DecoderFn<a>,
   acc: List<a>,
-) -> List<a> {
-  let (current_bit, _) = self |> bit
+) -> (List<a>, Decoder) {
+  let (current_bit, new_self) = self |> bit
   if current_bit {
-    let (decoded, new_decoder) = self |> decoder_func
-    do_decode_list_with(new_decoder, decoder_func, list.concat(acc, [decoded]))
+    let (decoded, new_decoder) = self |> decoder_fn
+    do_decode_list_with(new_decoder, decoder_fn, list.push(acc, decoded))
   } else {
-    acc
+    (acc, new_self)
   }
 }
 
@@ -114,6 +148,20 @@ fn bit(self: Decoder) -> (Bool, Decoder) {
     ( current_bit_as_byte |> bytearray.compare(#"00") ) == Greater
 
   (current_bit_is_on, self |> increment_buffer_by_bit)
+}
+
+/// Decoded bits are in reverse order here.
+fn do_bits(self: Decoder, so_far: Bits, bit_count: Int) -> (Bits, Decoder) {
+  if bit_count <= 0 {
+    (so_far, self)
+  } else {
+    let (b, new_self) = self |> bit
+    new_self |> do_bits([b, ..so_far], bit_count - 1)
+  }
+}
+
+pub fn bits(self: Decoder, bit_count: Int) -> (Bits, Decoder) {
+  self |> do_bits([], bit_count) |> map_decoded(list.reverse)
 }
 
 fn do_byte_array(
@@ -153,7 +201,7 @@ pub fn byte_array(self: Decoder) -> (ByteArray, Decoder) {
   do_byte_array(self, #"")
 }
 
-/// First output is a single byte.
+/// Decoded value is a single byte.
 pub fn bits8(self: Decoder, n: Int) -> (ByteArray, Decoder) {
   expect n <= 8
 
@@ -216,4 +264,169 @@ fn increment_buffer_by_bit(self: Decoder) -> Decoder {
 
 fn get_byte_at(self: ByteArray, i: Int) -> ByteArray {
   self |> bytearray.at(i) |> builtin.integer_to_bytearray(True, 1, _)
+}
+
+// ## Custom Type Decoders
+
+pub fn make_rec_2(
+  f0_decoder: DecoderFn<Data>,
+  f1_decoder: DecoderFn<Data>,
+) -> DecoderFn<List<Data>> {
+  fn(self: Decoder) -> (List<Data>, Decoder) {
+    self
+      |> f0_decoder
+      |> pipe(f1_decoder, fn(f0, f1) { [f0, f1] })
+  }
+}
+
+pub fn make_rec_3(
+  f0_decoder: DecoderFn<Data>,
+  f1_decoder: DecoderFn<Data>,
+  f2_decoder: DecoderFn<Data>,
+) -> DecoderFn<List<Data>> {
+  fn(self: Decoder) -> (List<Data>, Decoder) {
+    self
+      |> f0_decoder
+      |> pipe(f1_decoder, fn(f0, f1) { [f0, f1] })
+      |> pipe(f2_decoder, fn(fs, f2) { list.concat(fs, [f2]) })
+  }
+}
+
+pub fn make_rec_4(
+  f0_decoder: DecoderFn<Data>,
+  f1_decoder: DecoderFn<Data>,
+  f2_decoder: DecoderFn<Data>,
+  f3_decoder: DecoderFn<Data>,
+) -> DecoderFn<List<Data>> {
+  fn(self: Decoder) -> (List<Data>, Decoder) {
+    self
+      |> f0_decoder
+      |> pipe(f1_decoder, fn(f0, f1) { [f1, f0] })
+      |> pipe(f2_decoder, fn(fs, f2) { [f2, ..fs] })
+      |> pipe(f3_decoder, fn(fs, f3) { [f3, ..fs] })
+      |> map_decoded(list.reverse)
+  }
+}
+
+fn do_make_rec(
+  res_so_far: (List<Data>, Decoder),
+  decoder_fn_selector: fn(Int) -> DecoderFn<Data>,
+  curr_index: Int,
+  field_count: Int,
+) -> (List<Data>, Decoder) {
+  if curr_index >= field_count {
+    res_so_far |> map_decoded(list.reverse)
+  } else {
+    let decoder_fn = decoder_fn_selector(curr_index)
+    res_so_far
+      |> pipe(decoder_fn, fn(fs, f) { [f, ..fs] })
+      |> do_make_rec(decoder_fn_selector, curr_index + 1, field_count)
+  }
+}
+
+/// Helper for making record type decoders. `field_count` can't be negative, but
+/// this is not validated (TODO?).
+pub fn make_rec(
+  decoder_fn_selector: fn(Int) -> DecoderFn<Data>,
+  field_count: Int,
+) -> DecoderFn<List<Data>> {
+  fn(self: Decoder) -> (List<Data>, Decoder) {
+    do_make_rec(([], self), decoder_fn_selector, 0, field_count)
+  }
+}
+
+/// Helper for making decoders for sum types with 2 data constructors, with
+/// specified number of arguments each. More performant than using
+/// [`make_sum`](#make_sum). The `Data` in return type is a `Constr`.
+pub fn make_sum_2(
+  c0_decoders: fn(Int) -> DecoderFn<Data>,
+  c0_field_count: Int,
+  c1_decoders: fn(Int) -> DecoderFn<Data>,
+  c1_field_count: Int,
+) -> DecoderFn<Data> {
+  fn(self: Decoder) -> (Data, Decoder) {
+    let (is_one, one_bit_decoded) = self |> bit
+    if is_one {
+      let (fields, new_self) =
+        one_bit_decoded |> make_rec(c1_decoders, c1_field_count)
+      (builtin.constr_data(1, fields), new_self)
+    } else {
+      let (fields, new_self) =
+        one_bit_decoded |> make_rec(c0_decoders, c0_field_count)
+      (builtin.constr_data(0, fields), new_self)
+    }
+  }
+}
+
+/// Helper for making decoders for sum types with 3 data constructors, with
+/// specified number of arguments each. More performant than using
+/// [`make_sum`](#make_sum). The `Data` in return type is a `Constr`.
+pub fn make_sum_3(
+  c0_decoders: fn(Int) -> DecoderFn<Data>,
+  c0_field_count: Int,
+  c1_decoders: fn(Int) -> DecoderFn<Data>,
+  c1_field_count: Int,
+  c2_decoders: fn(Int) -> DecoderFn<Data>,
+  c2_field_count: Int,
+) -> DecoderFn<Data> {
+  fn(self: Decoder) -> (Data, Decoder) {
+    let (is_one, one_bit_decoded) = self |> bit
+    if is_one {
+      let (is_one, two_bits_decoded) = one_bit_decoded |> bit
+      if is_one {
+        let (fields, new_self) =
+          two_bits_decoded |> make_rec(c2_decoders, c2_field_count)
+        (builtin.constr_data(2, fields), new_self)
+      } else {
+        let (fields, new_self) =
+          two_bits_decoded |> make_rec(c1_decoders, c1_field_count)
+        (builtin.constr_data(1, fields), new_self)
+      }
+    } else {
+      let (fields, new_self) =
+        one_bit_decoded |> make_rec(c0_decoders, c0_field_count)
+      (builtin.constr_data(0, fields), new_self)
+    }
+  }
+}
+
+/// Helper for making decoders for sum types with 4 data constructors, with
+/// specified number of arguments each. More performant than using
+/// [`make_sum`](#make_sum). The `Data` in return type is a `Constr`.
+pub fn make_sum_4(
+  c0_decoders: fn(Int) -> DecoderFn<Data>,
+  c0_field_count: Int,
+  c1_decoders: fn(Int) -> DecoderFn<Data>,
+  c1_field_count: Int,
+  c2_decoders: fn(Int) -> DecoderFn<Data>,
+  c2_field_count: Int,
+  c3_decoders: fn(Int) -> DecoderFn<Data>,
+  c3_field_count: Int,
+) -> DecoderFn<Data> {
+  fn(self: Decoder) -> (Data, Decoder) {
+    let (is_one, one_bit_decoded) = self |> bit
+    if is_one {
+      let (is_one, two_bits_decoded) = one_bit_decoded |> bit
+      if is_one {
+        let (fields, new_self) =
+          two_bits_decoded |> make_rec(c3_decoders, c3_field_count)
+        (builtin.constr_data(3, fields), new_self)
+      } else {
+        let (fields, new_self) =
+          two_bits_decoded |> make_rec(c2_decoders, c2_field_count)
+        (builtin.constr_data(2, fields), new_self)
+      }
+    } else {
+      let (is_one, two_bits_decoded) = one_bit_decoded |> bit
+      if is_one {
+        let (fields, new_self) =
+          two_bits_decoded |> make_rec(c1_decoders, c1_field_count)
+        (builtin.constr_data(1, fields), new_self)
+      } else {
+        let (fields, new_self) =
+          two_bits_decoded |> make_rec(c0_decoders, c0_field_count)
+        (builtin.constr_data(0, fields), new_self)
+      }
+    }
+  }
 }
