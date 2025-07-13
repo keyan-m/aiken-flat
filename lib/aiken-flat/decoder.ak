@@ -442,7 +442,11 @@ pub fn make_sum(
   }
 }
 
-fn make_sum_helper(self: Decoder, flat_tree: FlatTree, acc: Bits) -> (Bits, Decoder) {
+fn make_sum_helper(
+  self: Decoder,
+  flat_tree: FlatTree,
+  acc: Bits,
+) -> (Bits, Decoder) {
   let (decoded_bit, one_bit_decoded) = self |> bit
   step_tree(
     flat_tree,
@@ -451,9 +455,7 @@ fn make_sum_helper(self: Decoder, flat_tree: FlatTree, acc: Bits) -> (Bits, Deco
     fn(new_tree, new_acc) {
       make_sum_helper(one_bit_decoded, new_tree, new_acc)
     },
-    fn(final_acc) {
-      (final_acc, one_bit_decoded)
-    },
+    fn(final_acc) { (final_acc, one_bit_decoded) },
   )
 }
 

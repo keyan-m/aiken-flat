@@ -1,8 +1,9 @@
 use aiken/fuzz
 use aiken/math.{max}
 use aiken_flat/bits.{
-  Bits, and_with_padding, and_with_truncation, from_bytearray, or_with_padding,
-  or_with_truncation, pad_to_byte, pretty_print, tag_to_bits, to_bytearray,
+  Bits, and_with_padding, and_with_truncation, bits_to_tag, from_bytearray,
+  or_with_padding, or_with_truncation, pad_to_byte, pretty_print, tag_to_bits,
+  to_bytearray,
 }
 
 test success__and_with_padding() {
@@ -322,4 +323,22 @@ test success_tag_to_bits_C97() {
 test success_tag_to_bits_C98() {
   let result = tag_to_bits(9, 8)
   result == [True, True, True, True]
+}
+
+fn fuzzer_for_tags(size: Int) -> Fuzzer<(Int, Int)> {
+  let count <- fuzz.and_then(fuzz.int_between(2, max(3, size)))
+  let tag <- fuzz.and_then(fuzz.int_between(0, count - 1))
+  fuzz.constant((count, tag))
+}
+
+test success__roundtrip_tag_bits_tag(
+  (constr_count, tag) via fuzzer_for_tags(255),
+) {
+  trace constr_count
+  trace tag
+  let bits = tag_to_bits(constr_count, tag)
+  let res = bits_to_tag(constr_count, bits)
+  trace bits
+  trace res
+  res == tag
 }

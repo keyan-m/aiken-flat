@@ -272,3 +272,22 @@ fn do_tag_to_bits(constr_count: Int, tag: Int, so_far: Bits) -> Bits {
 pub fn tag_to_bits(constr_count: Int, tag: Int) -> Bits {
   do_tag_to_bits(constr_count, tag, []) |> list.reverse
 }
+
+fn do_bits_to_tag(constr_count: Int, bits: Bits, so_far: Int) -> Int {
+  when bits is {
+    [curr_bit, ..rest] -> {
+      let halved = constr_count / 2
+      if curr_bit {
+        // Taking the right subtree -> sum with left subtree element count
+        do_bits_to_tag(constr_count - halved, rest, halved + so_far)
+      } else {
+        do_bits_to_tag(halved, rest, so_far)
+      }
+    }
+    [] -> so_far
+  }
+}
+
+pub fn bits_to_tag(constr_count: Int, bits: Bits) -> Int {
+  do_bits_to_tag(constr_count, bits, 0)
+}
