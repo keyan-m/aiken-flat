@@ -430,3 +430,136 @@ pub fn make_sum_4(
     }
   }
 }
+
+pub fn make_sum(
+  constr_count: Int,
+  decoder_fn_selector_factory: fn(Int) -> fn(Int) -> DecoderFn<Data>,
+) -> DecoderFn<Data> {
+  fn(self: Decoder) -> (Data, Decoder) {
+    let flat_tree = flat_tree_from_constr_count(constr_count)
+    let (constr_bits, new_self) = self |> make_sum_helper(flat_tree, [])
+    todo
+  }
+}
+
+fn make_sum_helper(self: Decoder, flat_tree: FlatTree, acc: Bits) -> (Bits, Decoder) {
+  let (decoded_bit, one_bit_decoded) = self |> bit
+  step_tree(
+    flat_tree,
+    decoded_bit,
+    acc,
+    fn(new_tree, new_acc) {
+      make_sum_helper(one_bit_decoded, new_tree, new_acc)
+    },
+    fn(final_acc) {
+      (final_acc, one_bit_decoded)
+    },
+  )
+}
+
+fn step_tree(
+  self: FlatTree,
+  flag: Bool,
+  acc: Bits,
+  continue: fn(FlatTree, Bits) -> result,
+  terminate: fn(Bits) -> result,
+) -> result {
+  let FlatTree { left_branch, right_branch } = self
+  let check_right =
+    fn() {
+      when right_branch is {
+        Leaf(right_value) ->
+          if right_value == flag {
+            terminate([right_value, ..acc])
+          } else {
+            // Shouldn't reach here, TODO?
+            terminate(acc)
+          }
+        Node { value, left, right } ->
+          if value == flag {
+            continue(
+              FlatTree { left_branch: left, right_branch: right },
+              [value, ..acc],
+            )
+          } else {
+            // Shouldn't reach here, TODO?
+            terminate(acc)
+          }
+      }
+    }
+  when left_branch is {
+    Leaf(left_value) ->
+      if left_value == flag {
+        terminate([left_value, ..acc])
+      } else {
+        check_right()
+      }
+    Node { value, left, right } ->
+      if value == flag {
+        continue(
+          FlatTree { left_branch: left, right_branch: right },
+          [value, ..acc],
+        )
+      } else {
+        check_right()
+      }
+  }
+}
+
+type FlatTree {
+  left_branch: FlatBranch,
+  right_branch: FlatBranch,
+}
+
+type FlatBranch {
+  Leaf(Bool)
+  Node { value: Bool, left: FlatBranch, right: FlatBranch }
+}
+
+fn flat_tree_from_constr_count(constr_count: Int) -> FlatTree {
+  // Using `expect` to avoid `Option`.
+  expect constr_count > 1
+  if constr_count == 2 {
+    FlatTree { left_branch: Leaf(False), right_branch: Leaf(True) }
+  } else if constr_count == 3 {
+    FlatTree {
+      left_branch: Leaf(False),
+      right_branch: Node { value: True, left: Leaf(False), right: Leaf(True) },
+    }
+  } else {
+    let halved = constr_count / 2
+    FlatTree {
+      left_branch: do_flat_branch_from_constr_count(halved, False),
+      right_branch: do_flat_branch_from_constr_count(
+        constr_count - halved,
+        True,
+      ),
+    }
+  }
+}
+
+fn do_flat_branch_from_constr_count(
+  constr_count: Int,
+  on_right: Bool,
+) -> FlatBranch {
+  // Avoiding validation on `constr_count` on the presumption that this function
+  // will only be invoked with `flat_tree_from_constr_count`.
+  if constr_count == 1 {
+    Leaf(on_right)
+  } else if constr_count == 2 {
+    Node { value: on_right, left: Leaf(False), right: Leaf(True) }
+  } else if constr_count == 3 {
+    Node {
+      value: on_right,
+      left: Leaf(False),
+      right: Node { value: True, left: Leaf(False), right: Leaf(True) },
+    }
+  } else {
+    let halved = constr_count / 2
+    Node {
+      value: on_right,
+      left: do_flat_branch_from_constr_count(halved, False),
+      right: do_flat_branch_from_constr_count(constr_count - halved, True),
+    }
+  }
+}
