@@ -530,7 +530,6 @@ test success__color() {
   //       integer |> contramap(builtin.un_i_data)
   //     }
   //   }
-
   let color_encoder = make_sum(3, color_encoder_factory)
   let abyss = new |> color_encoder(Abyss)
   let black_and_white = new |> color_encoder(BlackAndWhite { white: 0 })
