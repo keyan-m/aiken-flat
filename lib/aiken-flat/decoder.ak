@@ -521,55 +521,6 @@ fn make_sum_helper(
   make_sum_helper(one_bit_decoded, new_tree, new_acc)
 }
 
-fn step_tree(
-  self: FlatTree,
-  flag: Bool,
-  acc: Bits,
-  terminate: fn(Bits) -> result,
-  continue: fn(FlatTree, Bits) -> result,
-) -> result {
-  let FlatTree { left_branch, right_branch } = self
-  let check_right =
-    fn() {
-      when right_branch is {
-        Leaf(right_value) ->
-          if right_value == flag {
-            terminate([right_value, ..acc])
-          } else {
-            // Shouldn't reach here, TODO?
-            terminate(acc)
-          }
-        Node { value, left, right } ->
-          if value == flag {
-            continue(
-              FlatTree { left_branch: left, right_branch: right },
-              [value, ..acc],
-            )
-          } else {
-            // Shouldn't reach here, TODO?
-            terminate(acc)
-          }
-      }
-    }
-  when left_branch is {
-    Leaf(left_value) ->
-      if left_value == flag {
-        terminate([left_value, ..acc])
-      } else {
-        check_right()
-      }
-    Node { value, left, right } ->
-      if value == flag {
-        continue(
-          FlatTree { left_branch: left, right_branch: right },
-          [value, ..acc],
-        )
-      } else {
-        check_right()
-      }
-  }
-}
-
 type FlatTree {
   left_branch: FlatBranch,
   right_branch: FlatBranch,
@@ -625,5 +576,54 @@ fn do_flat_branch_from_constr_count(
       left: do_flat_branch_from_constr_count(halved, False),
       right: do_flat_branch_from_constr_count(constr_count - halved, True),
     }
+  }
+}
+
+fn step_tree(
+  self: FlatTree,
+  flag: Bool,
+  acc: Bits,
+  terminate: fn(Bits) -> result,
+  continue: fn(FlatTree, Bits) -> result,
+) -> result {
+  let FlatTree { left_branch, right_branch } = self
+  let check_right =
+    fn() {
+      when right_branch is {
+        Leaf(right_value) ->
+          if right_value == flag {
+            terminate([right_value, ..acc])
+          } else {
+            // Shouldn't reach here, TODO?
+            terminate(acc)
+          }
+        Node { value, left, right } ->
+          if value == flag {
+            continue(
+              FlatTree { left_branch: left, right_branch: right },
+              [value, ..acc],
+            )
+          } else {
+            // Shouldn't reach here, TODO?
+            terminate(acc)
+          }
+      }
+    }
+  when left_branch is {
+    Leaf(left_value) ->
+      if left_value == flag {
+        terminate([left_value, ..acc])
+      } else {
+        check_right()
+      }
+    Node { value, left, right } ->
+      if value == flag {
+        continue(
+          FlatTree { left_branch: left, right_branch: right },
+          [value, ..acc],
+        )
+      } else {
+        check_right()
+      }
   }
 }

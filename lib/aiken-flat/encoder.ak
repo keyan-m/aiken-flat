@@ -17,6 +17,15 @@ pub opaque type Encoder {
 type EncoderFn<a> =
   fn(Encoder, a) -> Encoder
 
+// ## Basics
+
+pub fn contramap(
+  encoder_fn: EncoderFn<a>,
+  mapping_fn: fn(b) -> a,
+) -> EncoderFn<b> {
+  fn(self: Encoder, x: b) -> Encoder { self |> encoder_fn(mapping_fn(x)) }
+}
+
 /// Initiate an encoder.
 pub const new: Encoder =
   Encoder { buffer: #"", used_bits: 0, current_byte: #"00" }
@@ -374,33 +383,39 @@ pub fn make_sum_4(
 /// ```
 /// The factory function for this datatype should be:
 /// ```aiken
-/// let color_encoder_factory = fn(tag: Int) {
-///   if tag == 0 {
-///     identity_encoder_fn_selector
-///   } else if tag == 1 {
-///     fn(f_index: Int) {
-///       if f_index == 0 {
-///         integer
-///       } else {
-///         fail
+/// let color_encoder_factory =
+///   fn(tag: Int) {
+///     if tag == 0 {
+///       identity_encoder_fn_selector
+///     } else if tag == 1 {
+///       fn(f_index: Int) {
+///         if f_index == 0 {
+///           integer |> contramap(builtin.un_i_data)
+///         } else {
+///           fail
+///         }
 ///       }
-///     }
-///   } else if tag == 2 {
-///     fn(f_index: Int) {
-///       if f_index <= 2 {
-///         integer // `integer` encoder in this module
-///       } else {
-///         fail
+///     } else if tag == 2 {
+///       fn(f_index: Int) {
+///         if f_index <= 2 {
+///           integer |> contramap(builtin.un_i_data)
+///         } else {
+///           fail
+///         }
 ///       }
+///     } else {
+///       fail
 ///     }
-///   } else {
-///     fail
 ///   }
-/// }
 /// ```
 /// In this case, it can be much simpler if we forgo the strictness:
 /// ```aiken
-/// let color_encoder_factory = fn(_) { fn(_) { integer } }
+/// let color_encoder_factory =
+///   fn(_) {
+///     fn(_) {
+///       integer |> contramap(builtin.un_i_data)
+///     }
+///   }
 /// ```
 /// And the encoder itself will be:
 /// ```aiken
@@ -420,7 +435,6 @@ pub fn make_sum(
 // ## Tests
 // Correct values acquired with Haskell's `flat` library.
 // {{{
-
 /// Datatype from the specs.
 type Direction {
   North
@@ -453,16 +467,87 @@ test success__direction() {
   trace east
   trace west
   and {
+    north.buffer == #"",
     north.used_bits == 2,
     north.current_byte == #"00",
+    south.buffer == #"",
     south.used_bits == 2,
     south.current_byte == #"40",
+    center.buffer == #"",
     center.used_bits == 2,
     center.current_byte == #"80",
+    east.buffer == #"",
     east.used_bits == 3,
     east.current_byte == #"c0",
+    west.buffer == #"",
     west.used_bits == 3,
     west.current_byte == #"e0",
+  }
+}
+
+type Color {
+  Abyss
+  BlackAndWhite { white: Int }
+  Colored { red: Int, green: Int, blue: Int }
+}
+
+/// ```
+///  data              encoded bits              current byte
+/// ----------------||------------------------||--------------
+/// Abyss           ─▶ 0b0                    ─▶ #"00"
+/// BlackAndWhite 0 ─▶ 0b10 <> (1 zero byte)  ─▶ #"00"
+/// Colored 0 0 0   ─▶ 0b11 <> (3 bytes of 0) ─▶ #"00"
+/// ```
+test success__color() {
+  let color_encoder_factory =
+    fn(tag: Int) {
+      if tag == 0 {
+        identity_encoder_fn_selector
+      } else if tag == 1 {
+        fn(f_index: Int) {
+          if f_index == 0 {
+            integer |> contramap(builtin.un_i_data)
+          } else {
+            fail
+          }
+        }
+      } else if tag == 2 {
+        fn(f_index: Int) {
+          if f_index <= 2 {
+            integer |> contramap(builtin.un_i_data)
+          } else {
+            fail
+          }
+        }
+      } else {
+        fail
+      }
+    }
+
+  // let color_encoder_factory =
+  //   fn(_) {
+  //     fn(_) {
+  //       integer |> contramap(builtin.un_i_data)
+  //     }
+  //   }
+
+  let color_encoder = make_sum(3, color_encoder_factory)
+  let abyss = new |> color_encoder(Abyss)
+  let black_and_white = new |> color_encoder(BlackAndWhite { white: 0 })
+  let colored = new |> color_encoder(Colored { red: 0, green: 0, blue: 0 })
+  trace abyss
+  trace black_and_white
+  trace colored
+  and {
+    abyss.buffer == #"",
+    abyss.used_bits == 1,
+    abyss.current_byte == #"00",
+    black_and_white.buffer == #"80",
+    black_and_white.used_bits == 2,
+    black_and_white.current_byte == #"00",
+    colored.buffer == #"c00000",
+    colored.used_bits == 2,
+    colored.current_byte == #"00",
   }
 }
 // }}}
