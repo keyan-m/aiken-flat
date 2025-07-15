@@ -1,8 +1,9 @@
 use aiken/builtin
 use aiken/collection/list
 use aiken/primitive/bytearray
-use aiken_flat/bits.{Bits, tag_to_bits}
+use aiken_flat/bits.{Bits, bits_to_tag}
 use aiken_flat/zig_zag.{zag_zig}
+use aiken_scott_utils/types.{Scott2}
 use internal/extra/bytearray as ba_extra
 
 /// Opaque type for decoding from a stored buffer.
@@ -20,6 +21,9 @@ type DecoderFn<a> =
 pub fn new(bytes: ByteArray) -> Decoder {
   Decoder { buffer: bytes, used_bits: 0, pos: 0 }
 }
+
+pub const identity_decoder_fn_selector =
+  fn(_: Int) -> DecoderFn<Data> { fn(self) { (builtin.list_data([]), self) } }
 
 // ## Basics
 
@@ -327,8 +331,8 @@ fn do_make_rec(
 /// Helper for making record type decoders. `field_count` can't be negative, but
 /// this is not validated (TODO?).
 pub fn make_rec(
-  decoder_fn_selector: fn(Int) -> DecoderFn<Data>,
   field_count: Int,
+  decoder_fn_selector: fn(Int) -> DecoderFn<Data>,
 ) -> DecoderFn<List<Data>> {
   fn(self: Decoder) -> (List<Data>, Decoder) {
     do_make_rec(([], self), decoder_fn_selector, 0, field_count)
@@ -348,11 +352,11 @@ pub fn make_sum_2(
     let (is_one, one_bit_decoded) = self |> bit
     if is_one {
       let (fields, new_self) =
-        one_bit_decoded |> make_rec(c1_decoders, c1_field_count)
+        one_bit_decoded |> make_rec(c1_field_count, c1_decoders)
       (builtin.constr_data(1, fields), new_self)
     } else {
       let (fields, new_self) =
-        one_bit_decoded |> make_rec(c0_decoders, c0_field_count)
+        one_bit_decoded |> make_rec(c0_field_count, c0_decoders)
       (builtin.constr_data(0, fields), new_self)
     }
   }
@@ -375,16 +379,16 @@ pub fn make_sum_3(
       let (is_one, two_bits_decoded) = one_bit_decoded |> bit
       if is_one {
         let (fields, new_self) =
-          two_bits_decoded |> make_rec(c2_decoders, c2_field_count)
+          two_bits_decoded |> make_rec(c2_field_count, c2_decoders)
         (builtin.constr_data(2, fields), new_self)
       } else {
         let (fields, new_self) =
-          two_bits_decoded |> make_rec(c1_decoders, c1_field_count)
+          two_bits_decoded |> make_rec(c1_field_count, c1_decoders)
         (builtin.constr_data(1, fields), new_self)
       }
     } else {
       let (fields, new_self) =
-        one_bit_decoded |> make_rec(c0_decoders, c0_field_count)
+        one_bit_decoded |> make_rec(c0_field_count, c0_decoders)
       (builtin.constr_data(0, fields), new_self)
     }
   }
@@ -409,36 +413,92 @@ pub fn make_sum_4(
       let (is_one, two_bits_decoded) = one_bit_decoded |> bit
       if is_one {
         let (fields, new_self) =
-          two_bits_decoded |> make_rec(c3_decoders, c3_field_count)
+          two_bits_decoded |> make_rec(c3_field_count, c3_decoders)
         (builtin.constr_data(3, fields), new_self)
       } else {
         let (fields, new_self) =
-          two_bits_decoded |> make_rec(c2_decoders, c2_field_count)
+          two_bits_decoded |> make_rec(c2_field_count, c2_decoders)
         (builtin.constr_data(2, fields), new_self)
       }
     } else {
       let (is_one, two_bits_decoded) = one_bit_decoded |> bit
       if is_one {
         let (fields, new_self) =
-          two_bits_decoded |> make_rec(c1_decoders, c1_field_count)
+          two_bits_decoded |> make_rec(c1_field_count, c1_decoders)
         (builtin.constr_data(1, fields), new_self)
       } else {
         let (fields, new_self) =
-          two_bits_decoded |> make_rec(c0_decoders, c0_field_count)
+          two_bits_decoded |> make_rec(c0_field_count, c0_decoders)
         (builtin.constr_data(0, fields), new_self)
       }
     }
   }
 }
 
+/// Helper function for generating decoders for sum types. The factory is
+/// expected to be a function that takes an index, which is the index of the
+/// constructor in the subject sum type, and a continuation that provides 2
+/// values: the number of fields for the given tag, and a decoder selector,
+/// which itself is a function that given the index of a field, returns a
+/// decoder. I've used Scott encoding here as a function cannot be put inside a
+/// tuple.
+///
+/// An example can be:
+/// ```aiken
+/// pub type Color {
+///   Abyss
+///   BlackAndWhite {
+///     white: Int,
+///   }
+///   Colored {
+///     red: Int,
+///     green: Int,
+///     blue: Int,
+///   }
+/// }
+/// ```
+/// The factory function for this datatype should be:
+/// ```aiken
+/// let color_decoder_factory =
+///   fn(
+///     tag: Int,
+///     return: Scott2<Int, fn(Int) -> DecoderFn<Data>, (Data, Decoder),
+///   ) -> (Data, Decoder) {
+///     if tag == 0 {
+///       return(0, identity_decoder_fn_selector)
+///     } if tag == 1 {
+///       return(1, fn(_) { integer })
+///     } if tag == 2 {
+///       return(3, fn(_) { integer })
+///     } else {
+///       fail
+///     }
+///   }
+/// ```
+/// And the decoder itself will be:
+/// ```aiken
+/// let color_decoder = make_sum(3, color_decoder_factory)
+/// ```
 pub fn make_sum(
   constr_count: Int,
-  decoder_fn_selector_factory: fn(Int) -> fn(Int) -> DecoderFn<Data>,
+  decoder_fn_selector_factory: fn(
+    Int,
+    Scott2<Int, fn(Int) -> DecoderFn<Data>, (Data, Decoder)>,
+  ) ->
+    (Data, Decoder),
 ) -> DecoderFn<Data> {
   fn(self: Decoder) -> (Data, Decoder) {
     let flat_tree = flat_tree_from_constr_count(constr_count)
     let (constr_bits, new_self) = self |> make_sum_helper(flat_tree, [])
-    todo
+    let constr_tag = bits_to_tag(constr_count, constr_bits)
+    let
+      tags_field_count,
+      decoder_fn_selector,
+    <- decoder_fn_selector_factory(constr_tag)
+    let rec_decoder = make_rec(tags_field_count, decoder_fn_selector)
+    new_self
+      |> rec_decoder
+      |> map_decoded(fn(fields) { builtin.constr_data(constr_tag, fields) })
   }
 }
 
@@ -448,23 +508,25 @@ fn make_sum_helper(
   acc: Bits,
 ) -> (Bits, Decoder) {
   let (decoded_bit, one_bit_decoded) = self |> bit
-  step_tree(
-    flat_tree,
-    decoded_bit,
-    acc,
-    fn(new_tree, new_acc) {
-      make_sum_helper(one_bit_decoded, new_tree, new_acc)
-    },
-    fn(final_acc) { (final_acc, one_bit_decoded) },
-  )
+  let
+    new_tree,
+    new_acc,
+  <-
+    step_tree(
+      flat_tree,
+      decoded_bit,
+      acc,
+      fn(final_acc) { (final_acc, one_bit_decoded) },
+    )
+  make_sum_helper(one_bit_decoded, new_tree, new_acc)
 }
 
 fn step_tree(
   self: FlatTree,
   flag: Bool,
   acc: Bits,
-  continue: fn(FlatTree, Bits) -> result,
   terminate: fn(Bits) -> result,
+  continue: fn(FlatTree, Bits) -> result,
 ) -> result {
   let FlatTree { left_branch, right_branch } = self
   let check_right =

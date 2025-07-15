@@ -360,12 +360,12 @@ pub fn make_sum_4(
 ///
 /// An example can be:
 /// ```aiken
-/// pub type Colored {
+/// pub type Color {
 ///   Abyss
 ///   BlackAndWhite {
 ///     white: Int,
 ///   }
-///   Color {
+///   Colored {
 ///     red: Int,
 ///     green: Int,
 ///     blue: Int,
@@ -374,7 +374,7 @@ pub fn make_sum_4(
 /// ```
 /// The factory function for this datatype should be:
 /// ```aiken
-/// let colored_encoder_factory = fn(tag: Int) {
+/// let color_encoder_factory = fn(tag: Int) {
 ///   if tag == 0 {
 ///     identity_encoder_fn_selector
 ///   } else if tag == 1 {
@@ -400,11 +400,11 @@ pub fn make_sum_4(
 /// ```
 /// In this case, it can be much simpler if we forgo the strictness:
 /// ```aiken
-/// let colored_encoder_factory = fn(_) { fn(_) { integer } }
+/// let color_encoder_factory = fn(_) { fn(_) { integer } }
 /// ```
 /// And the encoder itself will be:
 /// ```aiken
-/// let colored_encoder = make_sum(2, colored_encoder_factory)
+/// let color_encoder = make_sum(3, color_encoder_factory)
 /// ```
 pub fn make_sum(
   constr_count: Int,
