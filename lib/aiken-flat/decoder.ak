@@ -6,7 +6,8 @@ use aiken_flat/zig_zag.{zag_zig}
 use aiken_scott_utils/types.{Scott2}
 use internal/extra/bytearray as ba_extra
 use internal/test_utils.{
-  Abyss, BlackAndWhite, Center, Colored, Direction, East, North, South, West,
+  Abyss, BlackAndWhite, Center, Color, Colored, Direction, East, North, South,
+  West,
 }
 
 /// Opaque type for decoding from a stored buffer.
@@ -55,6 +56,12 @@ pub fn pipe(
   let (decoded_b, updated_self) = self |> next_decoder
   let decoded_c = monoid(decoded_a, decoded_b)
   (decoded_c, updated_self)
+}
+
+pub fn map(decoder_fn: DecoderFn<a>, mapping_fn: fn(a) -> b) -> DecoderFn<b> {
+  fn(self: Decoder) -> (b, Decoder) {
+    self |> decoder_fn |> map_decoded(mapping_fn)
+  }
 }
 
 // ## Runners
@@ -478,9 +485,9 @@ pub fn make_sum_4(
 ///     if tag == 0 {
 ///       return(0, identity_decoder_fn_selector)
 ///     } if tag == 1 {
-///       return(1, fn(_) { integer })
+///       return(1, fn(_) { integer |> map(builtin.i_data) })
 ///     } if tag == 2 {
-///       return(3, fn(_) { integer })
+///       return(3, fn(_) { integer |> map(builtin.i_data) })
 ///     } else {
 ///       fail
 ///     }
@@ -644,18 +651,26 @@ fn step_tree(
 // Correct values acquired with Haskell's `flat` library.
 // {{{
 
+/// ```
+/// North  ─▶ 0b00  ─▶ 0000 0000 ─▶ #"00"
+/// South  ─▶ 0b01  ─▶ 0100 0000 ─▶ #"40"
+/// Center ─▶ 0b100 ─▶ 1000 0000 ─▶ #"80"
+/// East   ─▶ 0b110 ─▶ 1100 0000 ─▶ #"C0"
+/// West   ─▶ 0b111 ─▶ 1110 0000 ─▶ #"E0"
+/// ```
 test success__direction() {
-  let direction_decoder = make_sum(5, identity_decoder_fn_selector_factory)
   let coercer =
     fn(d: Data) -> Direction {
       expect coerced: Direction = d
       coerced
     }
-  let (north, _) = new(#"00") |> direction_decoder |> map_decoded(coercer)
-  let (south, _) = new(#"40") |> direction_decoder |> map_decoded(coercer)
-  let (center, _) = new(#"80") |> direction_decoder |> map_decoded(coercer)
-  let (east, _) = new(#"c0") |> direction_decoder |> map_decoded(coercer)
-  let (west, _) = new(#"e0") |> direction_decoder |> map_decoded(coercer)
+  let direction_decoder =
+    make_sum(5, identity_decoder_fn_selector_factory) |> map(coercer)
+  let (north, _) = new(#"00") |> direction_decoder
+  let (south, _) = new(#"40") |> direction_decoder
+  let (center, _) = new(#"80") |> direction_decoder
+  let (east, _) = new(#"c0") |> direction_decoder
+  let (west, _) = new(#"e0") |> direction_decoder
   trace north
   trace south
   trace center
@@ -667,6 +682,48 @@ test success__direction() {
     center == Center,
     east == East,
     west == West,
+  }
+}
+
+/// ```
+///  data              encoded bits              bytes
+/// ----------------||------------------------||-------------
+/// Abyss           ─▶ 0b0                    ─▶ #"00"
+/// BlackAndWhite 0 ─▶ 0b10 <> (1 zero byte)  ─▶ #"8000"
+/// Colored 0 0 0   ─▶ 0b11 <> (3 bytes of 0) ─▶ #"C0000000"
+/// ```
+test success__color() {
+  let color_decoder_factory =
+    fn(
+      tag: Int,
+      return: Scott2<Int, fn(Int) -> DecoderFn<Data>, (Data, Decoder)>,
+    ) -> (Data, Decoder) {
+      if tag == 0 {
+        return(0, identity_decoder_fn_selector)
+      } else if tag == 1 {
+        return(1, fn(_) { integer |> map(builtin.i_data) })
+      } else if tag == 2 {
+        return(3, fn(_) { integer |> map(builtin.i_data) })
+      } else {
+        fail
+      }
+    }
+  let coercer =
+    fn(d: Data) -> Color {
+      expect coerced: Color = d
+      coerced
+    }
+  let color_decoder = make_sum(3, color_decoder_factory) |> map(coercer)
+  let (abyss, _) = new(#"00") |> color_decoder
+  let (black_and_white, _) = new(#"8000") |> color_decoder
+  let (colored, _) = new(#"c0000000") |> color_decoder
+  trace abyss
+  trace black_and_white
+  trace colored
+  and {
+    abyss == Abyss,
+    black_and_white == BlackAndWhite { white: 0 },
+    colored == Colored { red: 0, green: 0, blue: 0 },
   }
 }
 // }}}
