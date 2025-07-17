@@ -18,7 +18,7 @@ pub opaque type Decoder {
 }
 
 /// Function type shared by all decoders.
-type DecoderFn<a> =
+pub type DecoderFn<a> =
   fn(Decoder) -> (a, Decoder)
 
 /// Initiate a decoder.

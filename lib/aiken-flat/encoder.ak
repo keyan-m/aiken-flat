@@ -17,7 +17,7 @@ pub opaque type Encoder {
 }
 
 /// Function type shared by all encoders.
-type EncoderFn<a> =
+pub type EncoderFn<a> =
   fn(Encoder, a) -> Encoder
 
 // ## Basics
