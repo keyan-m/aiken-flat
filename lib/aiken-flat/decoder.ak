@@ -5,6 +5,9 @@ use aiken_flat/bits.{Bits, bits_to_tag}
 use aiken_flat/zig_zag.{zag_zig}
 use aiken_scott_utils/types.{Scott2}
 use internal/extra/bytearray as ba_extra
+use internal/test_utils.{
+  Abyss, BlackAndWhite, Center, Colored, Direction, East, North, South, West,
+}
 
 /// Opaque type for decoding from a stored buffer.
 pub opaque type Decoder {
@@ -24,6 +27,14 @@ pub fn new(bytes: ByteArray) -> Decoder {
 
 pub const identity_decoder_fn_selector =
   fn(_: Int) -> DecoderFn<Data> { fn(self) { (builtin.list_data([]), self) } }
+
+pub const identity_decoder_fn_selector_factory =
+  fn(_: Int, return: Scott2<Int, fn(Int) -> DecoderFn<Data>, (Data, Decoder)>) -> (
+    Data,
+    Decoder,
+  ) {
+    return(0, identity_decoder_fn_selector)
+  }
 
 // ## Basics
 
@@ -462,7 +473,7 @@ pub fn make_sum_4(
 /// let color_decoder_factory =
 ///   fn(
 ///     tag: Int,
-///     return: Scott2<Int, fn(Int) -> DecoderFn<Data>, (Data, Decoder),
+///     return: Scott2<Int, fn(Int) -> DecoderFn<Data>, (Data, Decoder)>,
 ///   ) -> (Data, Decoder) {
 ///     if tag == 0 {
 ///       return(0, identity_decoder_fn_selector)
@@ -489,7 +500,8 @@ pub fn make_sum(
 ) -> DecoderFn<Data> {
   fn(self: Decoder) -> (Data, Decoder) {
     let flat_tree = flat_tree_from_constr_count(constr_count)
-    let (constr_bits, new_self) = self |> make_sum_helper(flat_tree, [])
+    let (constr_bits, new_self) =
+      self |> make_sum_helper(flat_tree, []) |> map_decoded(list.reverse)
     let constr_tag = bits_to_tag(constr_count, constr_bits)
     let
       tags_field_count,
@@ -627,3 +639,34 @@ fn step_tree(
       }
   }
 }
+
+// ## Tests
+// Correct values acquired with Haskell's `flat` library.
+// {{{
+
+test success__direction() {
+  let direction_decoder = make_sum(5, identity_decoder_fn_selector_factory)
+  let coercer =
+    fn(d: Data) -> Direction {
+      expect coerced: Direction = d
+      coerced
+    }
+  let (north, _) = new(#"00") |> direction_decoder |> map_decoded(coercer)
+  let (south, _) = new(#"40") |> direction_decoder |> map_decoded(coercer)
+  let (center, _) = new(#"80") |> direction_decoder |> map_decoded(coercer)
+  let (east, _) = new(#"c0") |> direction_decoder |> map_decoded(coercer)
+  let (west, _) = new(#"e0") |> direction_decoder |> map_decoded(coercer)
+  trace north
+  trace south
+  trace center
+  trace east
+  trace west
+  and {
+    north == North,
+    south == South,
+    center == Center,
+    east == East,
+    west == West,
+  }
+}
+// }}}

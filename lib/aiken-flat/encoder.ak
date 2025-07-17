@@ -4,6 +4,9 @@ use aiken/primitive/bytearray
 use aiken_flat/bits.{Bits, tag_to_bits}
 use aiken_flat/zig_zag.{zig_zag}
 use internal/extra/bytearray as ba_extra
+use internal/test_utils.{
+  Abyss, BlackAndWhite, Center, Colored, East, North, South, West,
+}
 use internal/utils.{bytearray_chunks}
 
 /// Opaque type for encoding given values and collecting them in a buffer.
@@ -435,14 +438,6 @@ pub fn make_sum(
 // ## Tests
 // Correct values acquired with Haskell's `flat` library.
 // {{{
-/// Datatype from the specs.
-type Direction {
-  North
-  South
-  Center
-  East
-  West
-}
 
 /// `current_byte`s are occupied from left to right on a `#"00"`, so a `0b1`
 /// would yield a `used_bits == 1` and `current_byte` of `#"80"`.
@@ -483,12 +478,6 @@ test success__direction() {
     west.used_bits == 3,
     west.current_byte == #"e0",
   }
-}
-
-type Color {
-  Abyss
-  BlackAndWhite { white: Int }
-  Colored { red: Int, green: Int, blue: Int }
 }
 
 /// ```
