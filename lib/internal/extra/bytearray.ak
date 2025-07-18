@@ -1,6 +1,7 @@
 use aiken/builtin
 use aiken/primitive/bytearray
 
+/// Left shift with byte count extension as much as needed.
 pub fn shift_left(arr: ByteArray, shift: Int) -> ByteArray {
   let available_bits = leading_zeroes(arr)
   if available_bits >= shift {
@@ -24,6 +25,7 @@ fn do_repeat(bytes: ByteArray, n_times: Int, so_far: ByteArray) {
   }
 }
 
+/// Returns the number of leading zero _bits_ in a given `ByteArray`.
 pub fn leading_zeroes(arr: ByteArray) -> Int {
   do_leading_zeros(arr, 0)
 }
@@ -61,7 +63,8 @@ fn do_leading_zeros(arr: ByteArray, count_so_far: Int) -> Int {
   }
 }
 
-pub fn left_zero_pad_to_match(
+/// Left zero-pads the shorter `ByteArray` to match the longer one.
+pub fn match_lengths(
   left: ByteArray,
   right: ByteArray,
 ) -> (ByteArray, ByteArray) {
@@ -69,13 +72,22 @@ pub fn left_zero_pad_to_match(
   let right_length = bytearray.length(right)
   if left_length < right_length {
     let padding_length = right_length - left_length
-    (left |> zero_left_pad_by(padding_length), right)
+    (left |> left_zero_pad_by(padding_length), right)
   } else {
     let padding_length = left_length - right_length
-    (left, right |> zero_left_pad_by(padding_length))
+    (left, right |> left_zero_pad_by(padding_length))
   }
 }
 
-pub fn zero_left_pad_by(self: ByteArray, padding_length: Int) -> ByteArray {
+/// Pads the given `ByteArray` on the left with `padding_length` number of
+/// `#"00"`s.
+pub fn left_zero_pad_by(self: ByteArray, padding_length: Int) -> ByteArray {
   bytearray.concat(repeat(#"00", padding_length), self)
+}
+
+/// Drops all `#"00"` most significant bytes. Assumes big endian.
+pub fn drop_left_zero_pads(self: ByteArray) -> ByteArray {
+  self
+    |> builtin.bytearray_to_integer(True, _)
+    |> builtin.integer_to_bytearray(True, 0, _)
 }

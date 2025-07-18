@@ -84,23 +84,32 @@ pub fn integer(self: Encoder, x: Int) -> Encoder {
 }
 
 fn do_word(self: Encoder, d: ByteArray) -> Encoder {
-  let (_, padded_7f) = ba_extra.left_zero_pad_to_match(d, #"7f")
+  let (_, padded_7f) = ba_extra.match_lengths(d, #"7f")
+
+  // Pick 7 least significant bits of `d`.
   let w = builtin.and_bytearray(False, d, padded_7f)
+
+  // Remove zeros on the left and ensure `w` is a single byte.
   let w =
-    builtin.bytearray_to_integer(True, w)
-      |> builtin.integer_to_bytearray(True, 0, _)
-      |> builtin.or_bytearray(True, _, #"00")
+    ba_extra.drop_left_zero_pads(w) |> builtin.or_bytearray(True, _, #"00")
+
+  // Shift to right to remove the 7 bits we just stored in `w`.
   let shifted_d = d |> builtin.shift_bytearray(-7)
+
   let int_shifted_d = builtin.bytearray_to_integer(True, shifted_d)
+
+  // Not using `ba_extra.drop_left_zero_pads` since we already have found
+  // `int_shifted_d`.
   let shifted_d =
     int_shifted_d
       |> builtin.integer_to_bytearray(True, 0, _)
       |> builtin.or_bytearray(True, _, #"00")
+
   if int_shifted_d != 0 {
-    let (_, padded_80) = ba_extra.left_zero_pad_to_match(w, #"80")
-    let new_w = builtin.or_bytearray(False, w, padded_80)
-    let new_w_bits = bits.from_bytearray(new_w)
-    let new_encoder = self |> bits(new_w_bits)
+    // Make most significant bit of `w` ON. No need to left-pad `#"80"` since we
+    // already guaranteed `w` is a single byte.
+    let new_w = builtin.or_bytearray(False, w, #"80")
+    let new_encoder = self |> bits(bits.from_bytearray(new_w))
     do_word(new_encoder, shifted_d)
   } else {
     let w_bits = bits.from_bytearray(w)
@@ -111,7 +120,31 @@ fn do_word(self: Encoder, d: ByteArray) -> Encoder {
 pub fn word(self: Encoder, x: Int) -> Encoder {
   // Size of `0` is equivalent to minimum required byte count.
   self |> do_word(builtin.integer_to_bytearray(True, 0, x))
+  // self |> do_word_le(builtin.integer_to_bytearray(False, 0, x))
 }
+
+// TODO: A little endian approach can probably be more performant.
+// // Assumes `d` is in little endian.
+// fn do_word_le(self: Encoder, d: ByteArray) -> Encoder {
+//   // Pick 7 least significant bits of `d`.
+//   let w = builtin.and_bytearray(False, d, #"7f")
+// 
+//   // Shift to left to remove the 7 bits we just stored in `w`.
+//   let shifted_d = d |> builtin.shift_bytearray(7)
+// 
+//   let int_shifted_d = builtin.bytearray_to_integer(False, shifted_d)
+// 
+//   if int_shifted_d != 0 {
+//     // Make most significant bit of `w` ON. No need to left-pad `#"80"` since we
+//     // already guaranteed `w` is a single byte.
+//     let new_w = builtin.or_bytearray(False, w, #"80")
+//     let new_encoder = self |> bits(bits.from_bytearray(new_w))
+//     do_word(new_encoder, shifted_d)
+//   } else {
+//     let w_bits = bits.from_bytearray(w)
+//     self |> bits(w_bits)
+//   }
+// }
 
 pub fn encode_list_with(
   self: Encoder,
@@ -143,7 +176,7 @@ pub fn bits(self: Encoder, bits: Bits) -> Encoder {
 
 pub fn filler(self: Encoder) -> Encoder {
   let (padded_current_byte, padded_01) =
-    ba_extra.left_zero_pad_to_match(self.current_byte, #"01")
+    ba_extra.match_lengths(self.current_byte, #"01")
   Encoder {
     ..self,
     current_byte: builtin.or_bytearray(True, padded_current_byte, padded_01),
@@ -446,7 +479,7 @@ pub fn make_sum(
 /// ```
 /// North  ─▶ 0b00  ─▶ 0000 0000 ─▶ #"00"
 /// South  ─▶ 0b01  ─▶ 0100 0000 ─▶ #"40"
-/// Center ─▶ 0b100 ─▶ 1000 0000 ─▶ #"80"
+/// Center ─▶ 0b10  ─▶ 1000 0000 ─▶ #"80"
 /// East   ─▶ 0b110 ─▶ 1100 0000 ─▶ #"C0"
 /// West   ─▶ 0b111 ─▶ 1110 0000 ─▶ #"E0"
 /// ```

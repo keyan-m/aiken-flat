@@ -118,7 +118,7 @@ fn do_word(
     let word7 = builtin.and_bytearray(False, word8, #"7f")
     let shifted_word7 = ba_extra.shift_left(word7, shl)
     let (padded_final_word, padded_shifted_word7) =
-      ba_extra.left_zero_pad_to_match(final_word, shifted_word7)
+      ba_extra.match_lengths(final_word, shifted_word7)
     let new_final_word =
       builtin.or_bytearray(False, padded_final_word, padded_shifted_word7)
     let new_shl = shl + 7
@@ -654,7 +654,7 @@ fn step_tree(
 /// ```
 /// North  ─▶ 0b00  ─▶ 0000 0000 ─▶ #"00"
 /// South  ─▶ 0b01  ─▶ 0100 0000 ─▶ #"40"
-/// Center ─▶ 0b100 ─▶ 1000 0000 ─▶ #"80"
+/// Center ─▶ 0b10  ─▶ 1000 0000 ─▶ #"80"
 /// East   ─▶ 0b110 ─▶ 1100 0000 ─▶ #"C0"
 /// West   ─▶ 0b111 ─▶ 1110 0000 ─▶ #"E0"
 /// ```
