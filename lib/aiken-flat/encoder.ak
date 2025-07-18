@@ -3,6 +3,7 @@ use aiken/collection/list
 use aiken/primitive/bytearray
 use aiken_flat/bits.{Bits, tag_to_bits}
 use aiken_flat/zig_zag.{zig_zag}
+use aiken_scott_utils/list as scott_list
 use internal/extra/bytearray as ba_extra
 use internal/test_utils.{
   Abyss, BlackAndWhite, Center, Colored, East, North, South, West,
@@ -289,7 +290,7 @@ pub fn make_rec(
       _,
       final_encoder,
     <-
-      list.foldl2(
+      scott_list.foldl2(
         fields,
         0,
         self,
@@ -519,10 +520,16 @@ test success__color() {
   //       integer |> contramap(builtin.un_i_data)
   //     }
   //   }
+  // let color_encoder =
+  //   make_sum_3(
+  //     identity_encoder_fn_selector,
+  //     fn(_) { integer |> contramap(builtin.un_i_data) },
+  //     fn(_) { integer |> contramap(builtin.un_i_data) },
+  //   )
   let color_encoder = make_sum(3, color_encoder_factory)
   let abyss = new |> color_encoder(Abyss)
   let black_and_white = new |> color_encoder(BlackAndWhite { white: 0 })
-  let colored = new |> color_encoder(Colored { red: 0, green: 0, blue: 0 })
+  let colored = new |> color_encoder(Colored { red: 1, green: 0, blue: 0 })
   trace abyss
   trace black_and_white
   trace colored
@@ -533,7 +540,7 @@ test success__color() {
     black_and_white.buffer == #"80",
     black_and_white.used_bits == 2,
     black_and_white.current_byte == #"00",
-    colored.buffer == #"c00000",
+    colored.buffer == #"c08000",
     colored.used_bits == 2,
     colored.current_byte == #"00",
   }
