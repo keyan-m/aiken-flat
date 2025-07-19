@@ -1,6 +1,22 @@
 use aiken/collection/list
 use aiken/primitive/bytearray
 
+pub const i8_min_bound: Int = -128
+
+pub const i8_max_bound: Int = 127
+
+pub const i16_min_bound: Int = -32768
+
+pub const i16_max_bound: Int = 32767
+
+pub const i32_min_bound: Int = -2147483648
+
+pub const i32_max_bound: Int = 2147483647
+
+pub const i64_min_bound: Int = -9223372036854775808
+
+pub const i64_max_bound: Int = 9223372036854775807
+
 pub const i128_min_bound: Int = -170141183460469231731687303715884105728
 
 pub const i128_max_bound: Int = 170141183460469231731687303715884105727

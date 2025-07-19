@@ -15,10 +15,6 @@ pub fn encode_integer(self: Int) -> ByteArray {
   en.new |> en.integer(self) |> en.filler |> en.unwrap
 }
 
-pub fn encode_integer_le(self: Int) -> ByteArray {
-  en.new |> en.integer_le(self) |> en.filler |> en.unwrap
-}
-
 pub fn encode_word(self: Int) -> ByteArray {
   en.new |> en.word(self) |> en.filler |> en.unwrap
 }

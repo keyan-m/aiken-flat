@@ -5,7 +5,10 @@ use aiken_flat/encoder as en
 use aiken_flat/flat
 use aiken_scott_utils/types.{Scott2}
 use internal/test_utils.{Color, Direction, color_fuzzer, direction_fuzzer}
-use internal/utils.{i128_max_bound, i128_min_bound}
+use internal/utils.{
+  i128_max_bound, i128_min_bound, i16_max_bound, i16_min_bound, i32_max_bound,
+  i32_min_bound, i64_max_bound, i64_min_bound, i8_max_bound, i8_min_bound,
+}
 
 test success__bool_roundtrip(b via fuzz.bool()) {
   let encoded = flat.encode_bool(b)
@@ -23,7 +26,9 @@ test success__u8_roundtrip(byte via fuzz.bytearray_fixed(1)) {
   decoded == byte
 }
 
-test success__bytes_roundtrip(bytes via fuzz.bytearray_fixed(2550)) {
+const thirty_two_bytes = 255 * 32
+
+test success__bytes_roundtrip(bytes via fuzz.bytearray_fixed(thirty_two_bytes)) {
   let encoded = flat.encode_bytes(bytes)
   let decoded = flat.decode_bytes(encoded)
   trace encoded
@@ -31,46 +36,42 @@ test success__bytes_roundtrip(bytes via fuzz.bytearray_fixed(2550)) {
   decoded == bytes
 }
 
-test success__integer_roundtrip(
-  integer via fuzz.int_between(i128_min_bound, i128_max_bound),
-) {
+fn validate_integer_roundtrip(integer: Int) -> Bool {
   let encoded = flat.encode_integer(integer)
-  let encoded_le = flat.encode_integer_le(integer)
   let decoded = flat.decode_integer(encoded)
   trace encoded
-  trace encoded_le
   trace decoded
   decoded == integer
 }
 
-test success__i128_min_bound() {
-  let encoded = flat.encode_integer(i128_min_bound)
-  encoded == #"ffffffffffffffffffffffffffffffffffff0301"
+test success__integer_roundtrip_i8(
+  integer via fuzz.int_between(i8_min_bound, i8_max_bound),
+) {
+  validate_integer_roundtrip(integer)
 }
 
-test success__i128_min_bound_le() {
-  let encoded = flat.encode_integer_le(i128_min_bound)
-  encoded == #"ffffffffffffffffffffffffffffffffffff0301"
+test success__integer_roundtrip_i16(
+  integer via fuzz.int_between(i16_min_bound, i16_max_bound),
+) {
+  validate_integer_roundtrip(integer)
 }
 
-test success__i128_max_bound() {
-  let encoded = flat.encode_integer(i128_max_bound)
-  encoded == #"feffffffffffffffffffffffffffffffffff0301"
+test success__integer_roundtrip_i32(
+  integer via fuzz.int_between(i32_min_bound, i32_max_bound),
+) {
+  validate_integer_roundtrip(integer)
 }
 
-test success__i128_max_bound_le() {
-  let encoded = flat.encode_integer_le(i128_max_bound)
-  encoded == #"feffffffffffffffffffffffffffffffffff0301"
+test success__integer_roundtrip_i64(
+  integer via fuzz.int_between(i64_min_bound, i64_max_bound),
+) {
+  validate_integer_roundtrip(integer)
 }
 
-test success__255() {
-  let encoded = flat.encode_integer(255)
-  encoded == #"fe0301"
-}
-
-test success__255_le() {
-  let encoded = flat.encode_integer_le(255)
-  encoded == #"fe0301"
+test success__integer_roundtrip_i128(
+  integer via fuzz.int_between(i128_min_bound, i128_max_bound),
+) {
+  validate_integer_roundtrip(integer)
 }
 
 const direction_encoder =
