@@ -35,10 +35,42 @@ test success__integer_roundtrip(
   integer via fuzz.int_between(i128_min_bound, i128_max_bound),
 ) {
   let encoded = flat.encode_integer(integer)
+  let encoded_le = flat.encode_integer_le(integer)
   let decoded = flat.decode_integer(encoded)
   trace encoded
+  trace encoded_le
   trace decoded
   decoded == integer
+}
+
+test success__i128_min_bound() {
+  let encoded = flat.encode_integer(i128_min_bound)
+  encoded == #"ffffffffffffffffffffffffffffffffffff0301"
+}
+
+test success__i128_min_bound_le() {
+  let encoded = flat.encode_integer_le(i128_min_bound)
+  encoded == #"ffffffffffffffffffffffffffffffffffff0301"
+}
+
+test success__i128_max_bound() {
+  let encoded = flat.encode_integer(i128_max_bound)
+  encoded == #"feffffffffffffffffffffffffffffffffff0301"
+}
+
+test success__i128_max_bound_le() {
+  let encoded = flat.encode_integer_le(i128_max_bound)
+  encoded == #"feffffffffffffffffffffffffffffffffff0301"
+}
+
+test success__255() {
+  let encoded = flat.encode_integer(255)
+  encoded == #"fe0301"
+}
+
+test success__255_le() {
+  let encoded = flat.encode_integer_le(255)
+  encoded == #"fe0301"
 }
 
 const direction_encoder =
