@@ -86,9 +86,11 @@ const direction_decoder =
         },
       )
 
-const encode_direction = flat.make_encoder(direction_encoder)
+const encode_direction: fn(Direction) -> ByteArray =
+  flat.make_encoder(direction_encoder)
 
-const decode_direction = flat.make_decoder(direction_decoder)
+const decode_direction: fn(ByteArray) -> Direction =
+  flat.make_decoder(direction_decoder)
 
 test success__direction_roundtrip(direction via direction_fuzzer()) {
   let encoded = encode_direction(direction)
@@ -98,7 +100,7 @@ test success__direction_roundtrip(direction via direction_fuzzer()) {
   decoded == direction
 }
 
-fn color_encoder_factory(tag: Int) {
+fn color_encoder_factory(tag: Int) -> fn(Int) -> en.EncoderFn<Data> {
   if tag == 0 {
     en.identity_encoder_fn_selector
   } else if tag == 1 {
