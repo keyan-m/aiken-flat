@@ -1,42 +1,34 @@
 use aiken_flat/decoder as de
 use aiken_flat/encoder as en
 
-// ## Encoders
+// ## Basic Encoders
 
-pub fn encode_bool(self: Bool) -> ByteArray {
-  en.new |> en.bool(self) |> en.filler |> en.unwrap
+pub const encode_bool = make_encoder(en.bool)
+
+pub const unsafe_encode_u8 = make_encoder(en.unsafe_u8)
+
+pub const encode_integer = make_encoder(en.integer)
+
+pub const encode_bytes = make_encoder(en.bytes)
+
+// ## Basic Decoders
+
+pub const decode_bool = make_decoder(de.bool)
+
+pub const decode_u8 = make_decoder(de.u8)
+
+pub const decode_integer = make_decoder(de.integer)
+
+pub const decode_bytes = make_decoder(de.bytes)
+
+// ## Encoder Maker
+
+pub fn make_encoder(en: en.EncoderFn<a>) -> fn(a) -> ByteArray {
+  fn(self: a) -> ByteArray { en.new |> en(self) |> en.filler |> en.unwrap }
 }
 
-pub fn unsafe_encode_u8(self: ByteArray) -> ByteArray {
-  en.new |> en.unsafe_u8(self) |> en.filler |> en.unwrap
-}
+// ## Decoder Maker
 
-pub fn encode_integer(self: Int) -> ByteArray {
-  en.new |> en.integer(self) |> en.filler |> en.unwrap
-}
-
-pub fn encode_word(self: Int) -> ByteArray {
-  en.new |> en.word(self) |> en.filler |> en.unwrap
-}
-
-pub fn encode_bytes(self: ByteArray) -> ByteArray {
-  en.new |> en.bytes(self) |> en.filler |> en.unwrap
-}
-
-// ## Decoders
-
-pub fn decode_bool(bytes: ByteArray) -> Bool {
-  de.new(bytes) |> de.bool |> de.unwrap
-}
-
-pub fn decode_u8(bytes: ByteArray) -> ByteArray {
-  de.new(bytes) |> de.u8 |> de.unwrap
-}
-
-pub fn decode_integer(bytes: ByteArray) -> Int {
-  de.new(bytes) |> de.integer |> de.unwrap
-}
-
-pub fn decode_bytes(bytes: ByteArray) -> ByteArray {
-  de.new(bytes) |> de.bytes |> de.unwrap
+pub fn make_decoder(de: de.DecoderFn<a>) -> fn(ByteArray) -> a {
+  fn(bytes: ByteArray) -> a { de.new(bytes) |> de |> de.unwrap }
 }

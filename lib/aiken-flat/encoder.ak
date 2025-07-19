@@ -95,7 +95,6 @@ fn do_word(self: Encoder, d: ByteArray) -> Encoder {
   let w =
     ba_extra.drop_left_zero_pads(w) |> builtin.or_bytearray(True, _, #"00")
 
-  // let w = w |> bytearray.drop(bytearray.length(w) - 1)
   // Shift to right to remove the 7 bits we just stored in `w`.
   let shifted_d = d |> builtin.shift_bytearray(-7)
 

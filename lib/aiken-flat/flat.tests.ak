@@ -26,7 +26,7 @@ test success__u8_roundtrip(byte via fuzz.bytearray_fixed(1)) {
   decoded == byte
 }
 
-const thirty_two_bytes = 255 * 32
+const thirty_two_bytes = 256 * 32
 
 test success__bytes_roundtrip(bytes via fuzz.bytearray_fixed(thirty_two_bytes)) {
   let encoded = flat.encode_bytes(bytes)
@@ -86,13 +86,9 @@ const direction_decoder =
         },
       )
 
-fn encode_direction(self: Direction) -> ByteArray {
-  en.new |> direction_encoder(self) |> en.filler |> en.unwrap
-}
+const encode_direction = flat.make_encoder(direction_encoder)
 
-fn decode_direction(bytes: ByteArray) -> Direction {
-  de.new(bytes) |> direction_decoder |> de.unwrap
-}
+const decode_direction = flat.make_decoder(direction_decoder)
 
 test success__direction_roundtrip(direction via direction_fuzzer()) {
   let encoded = encode_direction(direction)
@@ -152,13 +148,9 @@ const color_decoder =
         },
       )
 
-fn encode_color(self: Color) -> ByteArray {
-  en.new |> color_encoder(self) |> en.filler |> en.unwrap
-}
+const encode_color = flat.make_encoder(color_encoder)
 
-fn decode_color(bytes: ByteArray) -> Color {
-  de.new(bytes) |> color_decoder |> de.unwrap
-}
+const decode_color = flat.make_decoder(color_decoder)
 
 test success__color_roundtrip(color via color_fuzzer()) {
   let encoded = encode_color(color)
