@@ -40,7 +40,8 @@ pub const identity_encoder_fn_selector =
   fn(_: Int) -> EncoderFn<Data> { fn(self, _) { self } }
 
 /// Identity encoder selector factory against tag indices (helpful for defining
-/// empty sum type encoders).
+/// "empty sum type" encoders, i.e. sum types that none of their constructors
+/// carry values).
 pub const identity_encoder_fn_selector_factory =
   fn(_: Int) { identity_encoder_fn_selector }
 
@@ -290,9 +291,6 @@ pub fn make_rec_4(
 /// Helper for creating record type encoders. The resulting encoder traverses a
 /// list of `Data` values and uses their indices to find their corresponding
 /// encoders from the provided selector function.
-/// 
-/// We're using `Data` here since Aiken does not support downcasting a
-/// polymorphic type yet.
 pub fn make_rec(
   encoder_fn_selector: fn(Int) -> EncoderFn<Data>,
 ) -> EncoderFn<List<Data>> {
