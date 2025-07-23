@@ -50,7 +50,8 @@ Here however, none of the constructors carry values, so we can just use the
 helper provided by `encoder`. We'll take a deeper look into this "selector" in
 the next example.
 
-The `en.contramap` is a sort of boilerplate that might be avoidable.
+The piping into `en.contramap` is a sort of boilerplate that might be avoidable
+in future iterations.
 
 #### Decoder
 The `decoder` module also has a `make_sum`:
@@ -85,8 +86,8 @@ const encode_direction: fn(Direction) -> ByteArray =
 const decode_direction: fn(ByteArray) -> Direction =
   flat.make_decoder(direction_decoder)
 ```
-As you can see, `Encoder` and `Decoder` are not involved anymore. These two will
-also take care of incorporating filler bits.
+As you can see, `Encoder` and `Decoder` are not involved anymore. These two new
+functions will also handle filler bits.
 
 ### `Color`
 For a custom type with values stored in some of its constructors, let's look at
@@ -101,9 +102,9 @@ pub type Color {
 
 #### Encoder
 
-For record types, we must simply concatenate encoded fields in order. `make_sum`
-therefore needs a way to know which encoder to use for each field of each
-constructor.
+Flat encoding of record types is simply the concatenation of encoded fields in
+order (without any fillers). `make_sum` therefore needs a way to know which
+encoder to use for each field of each constructor.
 
 So the second argument of `make_sum` is expected to be a function that first
 takes the "tag index" of a constructor, and returns another function, which
@@ -148,14 +149,15 @@ const color_encoder = en.make_sum(3, color_encoder_factory)
 
 #### Decoder
 
-The "factory" function for decoders is a bit more involved, as along with
+The "factory" function for decoders is a bit more involved, because along with
 decoder functions for each of the record types' fields, the factory also needs
 to inform the outer decoder of the number of fields expected for a given
 constructor.
 
 But Aiken currently doesn't allow for functions to be wrapped under other
 constructs (such as a `Pair`, which could be suitable here). Therefore, we must
-use Scott encoding to provide the factory with a continuation.
+use [Scott encoding](https://keyan-m.github.io/aiken-scott-utils/aiken_scott_utils/types.html#Scott2) to
+provide the factory with a continuation.
 ```aiken
 use aiken_flat/decoder as de
 
@@ -170,8 +172,7 @@ fn color_decoder_factory(
     // `BlackAndWhite` expects 1 integer to be decoded after its tag bits.
     return(1, fn(_) { de.integer |> de.map(builtin.i_data) })
   } else if tag == 2 {
-    // Similartly, `Colored` expects 3 integers to be decoded after its tag
-    // bits.
+    // Similarly, `Colored` expects 3 integers to be decoded after its tag bits.
     return(3, fn(_) { de.integer |> de.map(builtin.i_data) })
   } else {
     fail
@@ -202,8 +203,8 @@ const decode_color = flat.make_decoder(color_decoder)
 
 ## Running Tests
 
-Tests cover roundtrip tests for basic types, plus `Direction` and `Color` that
-we just looked at.
+Tests cover roundtrips for basic types, plus `Direction` and `Color` that we
+just looked at.
 
 1. (Optional) Run `aikup` to align your `aiken` version with the one stated in
    `aiken.toml` file here.
