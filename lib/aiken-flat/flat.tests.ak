@@ -74,8 +74,14 @@ test success__integer_roundtrip_i128(
   validate_integer_roundtrip(integer)
 }
 
-const direction_encoder =
+const direction_encoder: fn(en.Encoder, Direction) -> en.Encoder =
   en.make_sum(5, en.identity_encoder_fn_selector_factory)
+    |> en.contramap(
+        fn(c: Direction) -> Data {
+          let d: Data = c
+          d
+        },
+      )
 
 const direction_decoder =
   de.make_sum(5, de.identity_decoder_fn_selector_factory)

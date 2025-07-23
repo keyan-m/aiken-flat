@@ -33,8 +33,14 @@ encoder"):
 ```aiken
 use aiken_flat/encoder as en
 
-const direction_encoder =
+const direction_encoder: fn(en.Encoder, Direction) -> en.Encoder =
   en.make_sum(5, en.identity_encoder_fn_selector_factory)
+    |> en.contramap(
+        fn(c: Direction) -> Data {
+          let d: Data = c
+          d
+        },
+      )
 ```
 The first argument is the number of constructors in the target sum type. The
 second argument is more complex: it should be a function that given the index of
