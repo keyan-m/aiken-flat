@@ -108,16 +108,23 @@ test success__direction_roundtrip(direction via direction_fuzzer()) {
 
 fn color_encoder_factory(tag: Int) -> fn(Int) -> en.EncoderFn<Data> {
   if tag == 0 {
+    // `Abyss` has no values, so no encoder is needed.
     en.identity_encoder_fn_selector
   } else if tag == 1 {
+    // `BlackAndWhite` carries a single `Int`, so the encoder function must only
+    // encode the value at index `0` with `en.integer`.
     fn(f_index: Int) {
       if f_index == 0 {
+        // Similar to `Direction` encoder above, This `contramap` boilerplate is
+        // needed.
         en.integer |> en.contramap(builtin.un_i_data)
       } else {
         fail
       }
     }
   } else if tag == 2 {
+    // Similarly, `Colored` carries three `Int` values. Since they are all of
+    // the same type, we don't need to handle individual fields.
     fn(f_index: Int) {
       if f_index <= 2 {
         en.integer |> en.contramap(builtin.un_i_data)
@@ -137,10 +144,14 @@ fn color_decoder_factory(
   return: Scott2<Int, fn(Int) -> de.DecoderFn<Data>, (Data, de.Decoder)>,
 ) -> (Data, de.Decoder) {
   if tag == 0 {
+    // `Abyss` expects 0 values to be decoded after its tag bits.
     return(0, de.identity_decoder_fn_selector)
   } else if tag == 1 {
+    // `BlackAndWhite` expects 1 integer to be decoded after its tag bits.
     return(1, fn(_) { de.integer |> de.map(builtin.i_data) })
   } else if tag == 2 {
+    // Similartly, `Colored` expects 3 integers to be decoded after its tag
+    // bits.
     return(3, fn(_) { de.integer |> de.map(builtin.i_data) })
   } else {
     fail
