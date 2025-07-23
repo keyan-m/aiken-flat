@@ -72,7 +72,7 @@ Quite similar to its encoder counterpart.
 
 The two functions we defined are only capable of working with `Encoder` and
 `Decoder` values, which are essentially "states" that carry a buffer for
-tracking progress. They also don't use/consider filler bits.
+tracking progress. They also don't use/consider "filler" bits.
 
 To get the final Flat encoder/decoder functions, we must use the two other
 makers from `aiken_flat/flat`:
@@ -86,7 +86,7 @@ const decode_direction: fn(ByteArray) -> Direction =
   flat.make_decoder(direction_decoder)
 ```
 As you can see, `Encoder` and `Decoder` are not involved anymore. These two will
-also take care of incorporating "filler" bits.
+also take care of incorporating filler bits.
 
 ### `Color`
 For a custom type with values stored in some of its constructors, let's look at
@@ -148,13 +148,14 @@ const color_encoder = en.make_sum(3, color_encoder_factory)
 
 #### Decoder
 
-The "factory" function for decoders is a bit more complex, as along with decoder
-functions for each of the record types' fields, the factory also needs to inform
-the outer decoder of the number of fields expected for a given constructor.
+The "factory" function for decoders is a bit more involved, as along with
+decoder functions for each of the record types' fields, the factory also needs
+to inform the outer decoder of the number of fields expected for a given
+constructor.
 
 But Aiken currently doesn't allow for functions to be wrapped under other
 constructs (such as a `Pair`, which could be suitable here). Therefore, we must
-use Scott encoding to provide the factor with a continuation.
+use Scott encoding to provide the factory with a continuation.
 ```aiken
 use aiken_flat/decoder as de
 
@@ -198,3 +199,12 @@ const encode_color = flat.make_encoder(color_encoder)
 
 const decode_color = flat.make_decoder(color_decoder)
 ```
+
+## Running Tests
+
+Tests cover roundtrip tests for basic types, plus `Direction` and `Color` that
+we just looked at.
+
+1. (Optional) Run `aikup` to align your `aiken` version with the one stated in
+   `aiken.toml` file here.
+2. Run `aiken check`.
