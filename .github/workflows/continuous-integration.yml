@@ -16,3 +16,20 @@ jobs:
       - run: aiken fmt --check
       - run: aiken check -D
       - run: aiken build
+      - name: Generate docs
+        run: aiken docs -o docs
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'docs/'
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
