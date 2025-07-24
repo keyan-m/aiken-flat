@@ -1,3 +1,5 @@
+//// @hidden
+
 use aiken/fuzz
 
 /// Datatype from the specs.
