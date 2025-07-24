@@ -1,5 +1,5 @@
 name = "keyan-m/aiken-flat"
-version = "0.0.0"
+version = "0.1.0"
 compiler = "v1.1.17"
 plutus = "v3"
 license = "Apache-2.0"
