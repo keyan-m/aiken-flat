@@ -3,7 +3,6 @@ use aiken/collection/list
 use aiken/primitive/bytearray
 use aiken_flat/bits.{Bits, tag_to_bits}
 use aiken_flat/zig_zag.{zig_zag}
-use aiken_scott_utils/list as scott_list
 use internal/extra/bytearray as ba_extra
 use internal/test_utils.{
   Abyss, BlackAndWhite, Center, Colored, East, North, South, West,
@@ -299,7 +298,7 @@ pub fn make_rec(
       _,
       final_encoder,
     <-
-      scott_list.foldl2(
+      list.foldl2(
         fields,
         0,
         self,

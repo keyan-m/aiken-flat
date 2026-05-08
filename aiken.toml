@@ -1,6 +1,6 @@
 name = "keyan-m/aiken-flat"
-version = "0.1.0"
-compiler = "v1.1.17"
+version = "0.1.1"
+compiler = "v1.1.21"
 plutus = "v3"
 license = "Apache-2.0"
 description = "Aiken library for encoding/decoding Flat"
@@ -12,17 +12,17 @@ platform = "github"
 
 [[dependencies]]
 name = "aiken-lang/stdlib"
-version = "v2.2.0"
+version = "v3.1.0"
 source = "github"
 
 [[dependencies]]
 name = "aiken-lang/fuzz"
-version = "v2.1.1"
+version = "v2.2.0"
 source = "github"
 
 [[dependencies]]
 name = "keyan-m/aiken-scott-utils"
-version = "v1.3.0"
+version = "v1.4.0"
 source = "github"
 
 [config]

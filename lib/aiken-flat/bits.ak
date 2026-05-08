@@ -3,7 +3,6 @@ use aiken/collection/list
 use aiken/math
 use aiken/primitive/bytearray
 use aiken/primitive/string
-use aiken_scott_utils/list as scott_list
 use internal/utils.{zip_foldr}
 
 pub type Bit =
@@ -98,7 +97,7 @@ fn unsafe_one_byte_to_bytearray(bools: List<Bool>) -> ByteArray {
     res,
     _,
   <-
-    scott_list.foldr2(
+    list.foldr2(
       bools,
       #"00",
       0,
@@ -134,7 +133,7 @@ pub fn to_bytearray(bits: Bits) -> ByteArray {
     len_before_padding,
     bools_before_padding,
   <-
-    scott_list.foldr2(
+    list.foldr2(
       bits,
       0,
       [],
