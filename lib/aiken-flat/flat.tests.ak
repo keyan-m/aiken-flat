@@ -18,6 +18,28 @@ test success__bool_roundtrip(b via fuzz.bool()) {
   decoded == b
 }
 
+const encode_bool_list: fn(List<Bool>) -> ByteArray =
+  flat.make_encoder(
+    fn(self: en.Encoder, bools: List<Bool>) -> en.Encoder {
+      en.encode_list_with(self, bools, en.bool)
+    },
+  )
+
+const decode_bool_list: fn(ByteArray) -> List<Bool> =
+  flat.make_decoder(
+    fn(self: de.Decoder) -> (List<Bool>, de.Decoder) {
+      de.decode_list_with(self, de.bool)
+    },
+  )
+
+test success__bool_list_roundtrip(bools via fuzz.list_at_most(fuzz.bool(), 32)) {
+  let encoded = encode_bool_list(bools)
+  let decoded = decode_bool_list(encoded)
+  trace encoded
+  trace decoded
+  decoded == bools
+}
+
 test success__u8_roundtrip(byte via fuzz.bytearray_fixed(1)) {
   let encoded = flat.unsafe_encode_u8(byte)
   let decoded = flat.decode_u8(encoded)

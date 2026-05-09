@@ -145,7 +145,7 @@ fn do_decode_list_with(
 ) -> (List<a>, Decoder) {
   let (current_bit, new_self) = self |> bit
   if current_bit {
-    let (decoded, new_decoder) = self |> decoder_fn
+    let (decoded, new_decoder) = new_self |> decoder_fn
     do_decode_list_with(new_decoder, decoder_fn, list.push(acc, decoded))
   } else {
     (acc, new_self)
