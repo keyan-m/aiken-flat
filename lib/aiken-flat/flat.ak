@@ -35,5 +35,9 @@ pub fn make_encoder(en: en.EncoderFn<a>) -> fn(a) -> ByteArray {
 
 /// Decoder Maker
 pub fn make_decoder(de: de.DecoderFn<a>) -> fn(ByteArray) -> a {
-  fn(bytes: ByteArray) -> a { de.new(bytes) |> de |> de.unwrap }
+  fn(bytes: ByteArray) -> a {
+    let (value, decoder) = de.new(bytes) |> de
+    let Void = decoder |> de.expect_end
+    value
+  }
 }

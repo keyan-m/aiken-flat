@@ -18,6 +18,18 @@ test success__bool_roundtrip(b via fuzz.bool()) {
   decoded == b
 }
 
+test fail__decode_bool_without_final_filler() fail {
+  flat.decode_bool(#"80") == True
+}
+
+test fail__decode_bool_with_unaligned_final_filler() fail {
+  flat.decode_bool(#"c0") == True
+}
+
+test fail__decode_bool_with_trailing_bytes() fail {
+  flat.decode_bool(builtin.append_bytearray(flat.encode_bool(True), #"00")) == True
+}
+
 const encode_bool_list: fn(List<Bool>) -> ByteArray =
   flat.make_encoder(
     fn(self: en.Encoder, bools: List<Bool>) -> en.Encoder {

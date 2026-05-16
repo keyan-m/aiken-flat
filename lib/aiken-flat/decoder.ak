@@ -99,6 +99,13 @@ pub fn filler(self: Decoder) -> Decoder {
   }
 }
 
+pub fn expect_end(self: Decoder) -> Void {
+  let final_decoder = self |> filler
+  let Decoder { buffer, used_bits, pos } = final_decoder
+  expect used_bits == 0
+  expect pos == bytearray.length(buffer)
+}
+
 pub fn word(self: Decoder) -> (Int, Decoder) {
   let leading_bit = #"01"
   let final_word = #"00"
